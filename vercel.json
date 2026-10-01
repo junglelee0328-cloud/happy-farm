@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "npm --prefix happy-farm/web install",
+  "buildCommand": "npm --prefix happy-farm/web run build",
+  "outputDirectory": "happy-farm/web/dist",
+  "framework": null
+}
