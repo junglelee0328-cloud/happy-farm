@@ -8,6 +8,7 @@ import type {Floater, PlotWithCrop} from './components/FarmScene'
 import TopBar from './components/TopBar'
 import Toolbar from './components/Toolbar'
 import ShopModal from './components/ShopModal'
+import FriendModal from './components/FriendModal'
 import './App.css'
 
 let floaterId = 0
@@ -29,9 +30,14 @@ export default function App() {
   const [floaters, setFloaters] = useState<Floater[]>([])
   const [levelUp, setLevelUp] = useState<number | null>(null)
   const [clock, setClock] = useState(() => Date.now())
+  const [friendId, setFriendId] = useState<string | null>(null)
+  const [friendPlots, setFriendPlots] = useState<PlotWithCrop[]>([])
+  const [friendModalOpen, setFriendModalOpen] = useState(false)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const player = players.find((p) => p._id === playerId)
+  const friend = players.find((p) => p._id === friendId)
+  const friends = players.filter((p) => p._id !== playerId)
 
   const showToast = useCallback((msg: string, kind: 'info' | 'good' | 'bad' = 'info') => {
     setToast(msg)
@@ -88,6 +94,27 @@ export default function App() {
     const t = setInterval(() => setClock(Date.now()), 1000)
     return () => clearInterval(t)
   }, [])
+
+  // 好友农场的土地数据（做客时加载并轮询）
+  useEffect(() => {
+    if (!friendId) {
+      setFriendPlots([])
+      return
+    }
+    const load = () =>
+      client
+        .fetch<PlotWithCrop[]>('*[_type == "plot" && owner._ref == $pid] | order(index asc) {..., crop->}', {pid: friendId})
+        .then(setFriendPlots)
+        .catch(() => {})
+    load()
+    const poll = setInterval(load, 5000)
+    return () => clearInterval(poll)
+  }, [friendId])
+
+  const friendGrown = useMemo(
+    () => friendPlots.map((plot) => ({plot, growth: computeGrowth(plot, rule, clock)})),
+    [friendPlots, rule, clock],
+  )
 
   const grown = useMemo(() => plots.map((plot) => ({plot, growth: computeGrowth(plot, rule, clock)})), [plots, rule, clock])
 
@@ -182,6 +209,37 @@ export default function App() {
         .unset(['crop', 'plantedAt', 'stolenBy'])
         .commit()
     }, '🧹 铲除了枯萎的作物')
+
+  // 🥷 偷菜：规则全部来自 gameRule 文档（stealRatio / stealDailyLimit）
+  const steal = (plot: PlotWithCrop) =>
+    run(async () => {
+      const crop = plot.crop
+      if (!player || !crop || !friend) throw new Error('没有可偷的菜')
+      if (computeGrowth(plot, rule).status !== 'ready') throw new Error('还没熟，等等再来')
+      const limit = rule?.stealDailyLimit ?? 5
+      if ((player.stolenToday ?? 0) >= limit) throw new Error(`今天已偷满 ${limit} 次，明天再来`)
+      const thieves = (plot.stolenBy ?? '').split('、').filter(Boolean)
+      if (thieves.includes(player.nickname)) throw new Error('这块地已经被你偷过啦')
+      const amount = Math.max(1, Math.floor(crop.sellPrice * (rule?.stealRatio ?? 0.2)))
+      await client
+        .transaction()
+        .patch(plot._id, (p) => p.set({stolenBy: [...thieves, player.nickname].join('、')}))
+        .patch(player._id, (p) => p.inc({coins: amount, stolenToday: 1}))
+        .commit()
+      addFloater(plot.index, `🥷 +${amount} 💰`, 'coin')
+      return `偷了${friend.nickname}的${crop.name}，+${amount} 金币！`
+    }, '')
+
+  const visitFriend = (f: Player) => {
+    setFriendModalOpen(false)
+    setFriendId(f._id)
+    setSeedId('')
+  }
+
+  const goHome = () => {
+    setFriendId(null)
+    setSeedId('')
+  }
 
   const quickHarvest = () =>
     run(async () => {
@@ -279,12 +337,25 @@ export default function App() {
       />
 
       <main className="stage">
+        {friend && (
+          <div className="visiting-banner">
+            👀 你正在「{friend.farmName ?? `${friend.nickname}的农场`}」做客
+            <span className="visiting-sub">
+              今日偷菜 {player.stolenToday ?? 0}/{rule?.stealDailyLimit ?? 5} · 点成熟作物偷菜，也能帮忙浇水除草
+            </span>
+            <button className="home-btn" onClick={goHome}>🏠 回我的农场</button>
+          </div>
+        )}
         <FarmScene
-          items={grown}
-          player={player}
+          items={friend ? friendGrown : grown}
+          player={friend ?? player}
           busy={busy}
-          seedName={seed?.name}
+          seedName={friend ? undefined : seed?.name}
           floaters={floaters}
+          mode={friend ? 'friend' : 'mine'}
+          visitorName={player.nickname}
+          stolenLeft={(rule?.stealDailyLimit ?? 5) - (player.stolenToday ?? 0)}
+          stealRatio={rule?.stealRatio}
           onPlant={handleTilePlant}
           onOpenShop={openShopForPlot}
           onWater={water}
@@ -292,10 +363,13 @@ export default function App() {
           onClearBug={clearBug}
           onHarvest={harvest}
           onClearWithered={clearWithered}
+          onSteal={steal}
         />
 
         <div className="stage-hint">
-          {seed ? (
+          {friend ? (
+            <span className="hint-chip active">🥷 做客模式：点成熟的菜偷走它 · 好友的生长中作物可以帮忙照料</span>
+          ) : seed ? (
             <span className="hint-chip active">🌱 已选中「{seed.name}」，点空地播种 · Esc 取消</span>
           ) : (
             <span className="hint-chip">💡 在下方「种子包」选一粒种子 → 点空地播种 · 浇水加速 · 成熟点一下就收</span>
@@ -319,14 +393,21 @@ export default function App() {
         selectedSeedId={seedId}
         readyCount={readyItems.length}
         thirstyCount={thirstyItems.length}
+        visiting={!!friend}
         onSelectSeed={setSeedId}
         onOpenShop={openGeneralShop}
         onQuickHarvest={quickHarvest}
         onQuickWater={quickWater}
+        onOpenFriends={() => setFriendModalOpen(true)}
+        onGoHome={goHome}
         onToast={showToast}
       />
 
       {toast && <div className={`toast ${toastKind}`}>{toast}</div>}
+
+      {friendModalOpen && (
+        <FriendModal friends={friends} onClose={() => setFriendModalOpen(false)} onVisit={visitFriend} />
+      )}
 
       {shopOpen && (
         <ShopModal

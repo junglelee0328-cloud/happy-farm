@@ -1356,6 +1356,139 @@
 }
 
 /* ==================================================================
+   好友 / 偷菜
+   ================================================================== */
+
+.visiting-banner {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 20px 9px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(52, 34, 14, 0.94), rgba(38, 24, 8, 0.94));
+  border: 2px solid #e8c87e;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  color: #ffe9b8;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.visiting-sub {
+  font-size: 11px;
+  font-weight: 600;
+  color: #d9b071;
+}
+
+.home-btn {
+  margin-top: 5px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #5b3a17;
+  padding: 4px 16px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #fffdf4, #f0dcb4);
+  border: 2px solid #a97b48;
+  box-shadow: 0 2px 0 #8a6136;
+}
+
+.home-btn:hover {
+  transform: translateY(-1px);
+}
+
+.friend-modal {
+  width: 420px;
+}
+
+.friend-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.friend-empty {
+  font-size: 13px;
+  color: #8a6a3a;
+  text-align: center;
+  padding: 18px 0;
+}
+
+.friend-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fffef9, #fdf4e2);
+  border: 2px solid #c9a878;
+  box-shadow: 0 3px 0 #bd9a68;
+  text-align: left;
+  transition: transform 0.12s, border-color 0.12s;
+}
+
+.friend-item:hover {
+  transform: translateY(-2px);
+  border-color: #f0a91b;
+}
+
+.friend-avatar {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  background: radial-gradient(circle at 35% 30%, #d8f7a8, #7ec44a);
+  border: 2px solid #fffdf4;
+  box-shadow: 0 0 0 2px #8a6136;
+}
+
+.friend-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.friend-info b {
+  display: block;
+  font-size: 15px;
+  font-weight: 900;
+  color: #4a3418;
+}
+
+.friend-info i {
+  display: block;
+  font-size: 11px;
+  font-style: normal;
+  color: #a1865c;
+}
+
+.friend-go {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #9ee063, #5cae2c);
+  border: 1px solid #3f7f22;
+  text-shadow: 0 1px 0 rgba(47, 106, 18, 0.7);
+}
+
+.visiting-section {
+  flex: 1 1 auto;
+  align-items: center;
+}
+
+/* ==================================================================
    自适应
    ================================================================== */
 

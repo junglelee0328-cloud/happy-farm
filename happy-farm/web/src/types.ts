@@ -32,6 +32,7 @@ export interface Plot {
   isWatered: boolean
   hasWeed: boolean
   hasBug: boolean
+  stolenBy?: string
 }
 
 export interface GameRule {

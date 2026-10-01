@@ -50,6 +50,13 @@ interface Props {
   busy: boolean
   seedName?: string
   floaters: Floater[]
+  /** 'mine' = 自己的农场，'friend' = 好友农场（只能偷菜/帮忙） */
+  mode?: 'mine' | 'friend'
+  /** 好友模式下：当前访客（我）的昵称，用于判断这块地有没有被我偷过 */
+  visitorName?: string
+  /** 好友模式下：今天剩余的偷菜次数 */
+  stolenLeft?: number
+  stealRatio?: number
   onPlant: (plot: PlotWithCrop) => void
   onOpenShop: (plot: PlotWithCrop) => void
   onWater: (plot: PlotWithCrop) => void
@@ -57,6 +64,7 @@ interface Props {
   onClearBug: (plot: PlotWithCrop) => void
   onHarvest: (plot: PlotWithCrop) => void
   onClearWithered: (plot: PlotWithCrop) => void
+  onSteal?: (plot: PlotWithCrop) => void
 }
 
 function stageOf(growth: GrowthState): Stage {
@@ -153,6 +161,10 @@ export default function FarmScene({
   busy,
   seedName,
   floaters,
+  mode = 'mine',
+  visitorName,
+  stolenLeft,
+  stealRatio,
   onPlant,
   onOpenShop,
   onWater,
@@ -160,6 +172,7 @@ export default function FarmScene({
   onClearBug,
   onHarvest,
   onClearWithered,
+  onSteal,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const [aspect, setAspect] = useState(BASE_VIEW.w / BASE_VIEW.h)
@@ -264,6 +277,10 @@ export default function FarmScene({
 
   function clickPlot(plot: PlotWithCrop, growth: GrowthState) {
     if (busy) return
+    if (mode === 'friend') {
+      if (growth.status === 'ready') onSteal?.(plot)
+      return
+    }
     if (growth.status === 'empty') {
       if (seedName) onPlant(plot)
       else onOpenShop(plot)
@@ -406,6 +423,10 @@ export default function FarmScene({
             player={player}
             busy={busy}
             seedName={seedName}
+            mode={mode}
+            visitorName={visitorName}
+            stolenLeft={stolenLeft}
+            stealRatio={stealRatio}
             onPlant={onPlant}
             onOpenShop={onOpenShop}
             onWater={onWater}
@@ -413,6 +434,7 @@ export default function FarmScene({
             onClearBug={onClearBug}
             onHarvest={onHarvest}
             onClearWithered={onClearWithered}
+            onSteal={onSteal}
           />
         </div>
       )}
@@ -432,6 +454,10 @@ interface TipProps {
   player: Player
   busy: boolean
   seedName?: string
+  mode: 'mine' | 'friend'
+  visitorName?: string
+  stolenLeft?: number
+  stealRatio?: number
   onPlant: (plot: PlotWithCrop) => void
   onOpenShop: (plot: PlotWithCrop) => void
   onWater: (plot: PlotWithCrop) => void
@@ -439,6 +465,7 @@ interface TipProps {
   onClearBug: (plot: PlotWithCrop) => void
   onHarvest: (plot: PlotWithCrop) => void
   onClearWithered: (plot: PlotWithCrop) => void
+  onSteal?: (plot: PlotWithCrop) => void
 }
 
 function PlotTip({
@@ -446,6 +473,10 @@ function PlotTip({
   player,
   busy,
   seedName,
+  mode,
+  visitorName,
+  stolenLeft,
+  stealRatio,
   onPlant,
   onOpenShop,
   onWater,
@@ -453,6 +484,7 @@ function PlotTip({
   onClearBug,
   onHarvest,
   onClearWithered,
+  onSteal,
 }: TipProps) {
   const {plot, growth} = item
   const locked = player.level < (plot.unlockLevel ?? 1)
@@ -463,6 +495,51 @@ function PlotTip({
           🔒 第 {plot.index} 号地
         </div>
         <div className="tip-sub">达到 Lv.{plot.unlockLevel ?? 1} 解锁</div>
+      </div>
+    )
+  }
+
+  // ===== 好友农场模式：偷菜 / 帮忙 =====
+  if (mode === 'friend') {
+    const alreadyStolen = !!visitorName && (plot.stolenBy ?? '').split('、').includes(visitorName)
+    const stealAmount = plot.crop ? Math.max(1, Math.floor(plot.crop.sellPrice * (stealRatio ?? 0.2))) : 0
+    const actions: ReactNode[] = []
+    if (growth.status === 'ready') {
+      const disabled = busy || alreadyStolen || (stolenLeft ?? 0) <= 0
+      actions.push(
+        <button key="s" className="tip-btn warn" disabled={disabled} onClick={() => onSteal?.(plot)}>
+          🥷 {alreadyStolen ? '这块已经偷过啦' : (stolenLeft ?? 0) <= 0 ? '今日次数用完' : `偷走它 +${stealAmount}💰`}
+        </button>,
+      )
+    }
+    if (growth.status === 'growing') {
+      if (!plot.isWatered)
+        actions.push(<button key="w" className="tip-btn" disabled={busy} onClick={() => onWater(plot)}>💧 帮忙浇水</button>)
+      if (plot.hasWeed)
+        actions.push(<button key="g" className="tip-btn" disabled={busy} onClick={() => onClearWeed(plot)}>🌾 帮忙除草</button>)
+      if (plot.hasBug)
+        actions.push(<button key="b" className="tip-btn" disabled={busy} onClick={() => onClearBug(plot)}>🐛 帮忙除虫</button>)
+    }
+    const friendText =
+      growth.status === 'empty'
+        ? '好友还没种东西'
+        : growth.status === 'growing'
+          ? `还没熟，还剩 ${formatCountdown(growth.secondsLeft)}`
+          : growth.status === 'ready'
+            ? alreadyStolen
+              ? '被你偷过一茬了'
+              : `熟了！可偷 ${stealAmount}💰`
+            : '枯萎了，真可惜'
+    return (
+      <div className="tip-card">
+        <div className="tip-title">
+          <span className="tip-emoji">{plot.crop?.emoji ?? '🟫'}</span>
+          第 {plot.index} 号地
+          {plot.crop && <span className="tip-crop">{plot.crop.name}</span>}
+        </div>
+        <div className="tip-sub">{friendText}</div>
+        {plot.stolenBy && <div className="tip-sub">🥷 被偷过：{plot.stolenBy}</div>}
+        {actions.length > 0 && <div className="tip-actions">{actions}</div>}
       </div>
     )
   }

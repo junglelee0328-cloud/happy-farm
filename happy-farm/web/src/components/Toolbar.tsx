@@ -7,10 +7,13 @@ interface Props {
   selectedSeedId: string
   readyCount: number
   thirstyCount: number
+  visiting: boolean
   onSelectSeed: (id: string) => void
   onOpenShop: () => void
   onQuickHarvest: () => void
   onQuickWater: () => void
+  onOpenFriends: () => void
+  onGoHome: () => void
   onToast: (msg: string) => void
 }
 
@@ -20,12 +23,36 @@ export default function Toolbar({
   selectedSeedId,
   readyCount,
   thirstyCount,
+  visiting,
   onSelectSeed,
   onOpenShop,
   onQuickHarvest,
   onQuickWater,
+  onOpenFriends,
+  onGoHome,
   onToast,
 }: Props) {
+  if (visiting) {
+    return (
+      <footer className="hud-bottom">
+        <div className="dock">
+          <div className="dock-section visiting-section">
+            <div className="dock-title">
+              <span>🥷 做客模式</span>
+              <i>好友的菜只能偷，不能动他的仓库</i>
+            </div>
+            <div className="tool-row">
+              <button className="tool-btn" onClick={onGoHome}>
+                <span className="tool-ico">🏠</span>
+                <span>回我的农场</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </footer>
+    )
+  }
+
   return (
     <footer className="hud-bottom">
       <div className="dock">
@@ -91,7 +118,7 @@ export default function Toolbar({
               <span className="tool-ico">📋</span>
               <span>任务</span>
             </button>
-            <button className="tool-btn" onClick={() => onToast('👥 好友系统即将上线，先去偷隔壁老王的菜吧')}>
+            <button className="tool-btn" onClick={onOpenFriends}>
               <span className="tool-ico">👥</span>
               <span>好友</span>
             </button>
