@@ -1,0 +1,13 @@
+{"_id":"crop-radish","_type":"crop","name":"白萝卜","emoji":"🥬","stageEmojis":["🌱","🌿","🍃","🥬"],"seedPrice":15,"sellPrice":30,"growTime":60,"exp":10,"minLevel":1,"description":"新手第一课，一分钟就能收。"}
+{"_id":"crop-carrot","_type":"crop","name":"胡萝卜","emoji":"🥕","stageEmojis":["🌱","🌿","☘️","🥕"],"seedPrice":30,"sellPrice":66,"growTime":120,"exp":15,"minLevel":2,"description":"兔子最爱，性价比之王。"}
+{"_id":"crop-corn","_type":"crop","name":"玉米","emoji":"🌽","stageEmojis":["🌱","🌿","🌾","🌽"],"seedPrice":60,"sellPrice":135,"growTime":300,"exp":25,"minLevel":3,"description":"金灿灿的五分钟收获。"}
+{"_id":"crop-strawberry","_type":"crop","name":"草莓","emoji":"🍓","stageEmojis":["🌱","🌿","🌸","🍓"],"seedPrice":120,"sellPrice":288,"growTime":600,"exp":40,"minLevel":5,"description":"少女心作物，还很值钱。"}
+{"_id":"crop-watermelon","_type":"crop","name":"西瓜","emoji":"🍉","stageEmojis":["🌱","🌿","🌼","🍉"],"seedPrice":300,"sellPrice":750,"growTime":1800,"exp":80,"minLevel":8,"description":"夏日王者，半小时的大生意。"}
+{"_id":"player-zhang","_type":"player","nickname":"老农小张","avatar":"🧑‍🌾","farmName":"快乐农场一号","level":3,"xp":120,"coins":500,"stolenToday":0}
+{"_id":"plot-1","_type":"plot","index":1,"owner":{"_type":"reference","_ref":"player-zhang"},"status":"empty"}
+{"_id":"plot-2","_type":"plot","index":2,"owner":{"_type":"reference","_ref":"player-zhang"},"crop":{"_type":"reference","_ref":"crop-carrot"},"plantedAt":"2026-09-29T16:27:34Z","status":"growing","isWatered":true}
+{"_id":"plot-3","_type":"plot","index":3,"owner":{"_type":"reference","_ref":"player-zhang"},"crop":{"_type":"reference","_ref":"crop-radish"},"plantedAt":"2026-09-29T14:28:04Z","status":"ready"}
+{"_id":"plot-4","_type":"plot","index":4,"owner":{"_type":"reference","_ref":"player-zhang"},"crop":{"_type":"reference","_ref":"crop-corn"},"plantedAt":"2026-09-28T14:28:04Z","status":"withered"}
+{"_id":"plot-5","_type":"plot","index":5,"owner":{"_type":"reference","_ref":"player-zhang"},"crop":{"_type":"reference","_ref":"crop-strawberry"},"plantedAt":"2026-09-29T16:27:34Z","status":"growing","hasWeed":true}
+{"_id":"plot-6","_type":"plot","index":6,"owner":{"_type":"reference","_ref":"player-zhang"},"crop":{"_type":"reference","_ref":"crop-watermelon"},"plantedAt":"2026-09-29T16:27:34Z","status":"growing","hasBug":true,"stolenBy":"隔壁老王"}
+{"_id":"rule-main","_type":"gameRule","xpToNextLevel":[{"level":1,"xpNeeded":50},{"level":2,"xpNeeded":100},{"level":3,"xpNeeded":200},{"level":4,"xpNeeded":400},{"level":5,"xpNeeded":800},{"level":6,"xpNeeded":1600},{"level":7,"xpNeeded":3200},{"level":8,"xpNeeded":6400}],"waterSpeedBoost":0.2,"witherAfter":3600,"weedChance":0.3,"bugChance":0.2,"stealDailyLimit":5,"stealRatio":0.2,"basePlotCount":6}

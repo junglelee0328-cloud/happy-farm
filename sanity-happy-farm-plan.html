@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sanity × 快乐农场：竞赛实践指南</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+    background: #f4f7f4;
+    color: #2d3a2e;
+    line-height: 1.8;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 40px 24px 80px; }
+  header {
+    background: linear-gradient(135deg, #4caf50, #2e7d32);
+    color: #fff; border-radius: 16px; padding: 36px 32px; margin-bottom: 32px;
+  }
+  header h1 { font-size: 28px; margin-bottom: 8px; }
+  header p { opacity: .9; }
+  .badge {
+    display: inline-block; background: rgba(255,255,255,.2); border-radius: 999px;
+    padding: 2px 14px; font-size: 13px; margin-bottom: 12px;
+  }
+  section {
+    background: #fff; border-radius: 12px; padding: 28px 32px;
+    margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,.05);
+  }
+  h2 {
+    font-size: 20px; color: #2e7d32; margin-bottom: 16px;
+    padding-bottom: 8px; border-bottom: 2px solid #e0f0e0;
+  }
+  h3 { font-size: 16px; color: #33691e; margin: 18px 0 8px; }
+  ul, ol { padding-left: 24px; margin: 8px 0; }
+  li { margin: 4px 0; }
+  code {
+    background: #f0f4f0; color: #c2185b; padding: 2px 6px;
+    border-radius: 4px; font-size: .92em; font-family: "SF Mono", Menlo, monospace;
+  }
+  pre {
+    background: #263238; color: #e8f0e8; padding: 16px 20px;
+    border-radius: 8px; overflow-x: auto; font-size: 13px;
+    font-family: "SF Mono", Menlo, monospace; margin: 10px 0;
+  }
+  pre code { background: none; color: inherit; padding: 0; }
+  .note {
+    background: #fff8e1; border-left: 4px solid #ffb300;
+    padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 12px 0;
+  }
+  .tip {
+    background: #e8f5e9; border-left: 4px solid #4caf50;
+    padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 12px 0;
+  }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid #e0e8e0; padding: 8px 12px; text-align: left; }
+  th { background: #f0f7f0; }
+  .step-num {
+    display: inline-flex; width: 26px; height: 26px; border-radius: 50%;
+    background: #4caf50; color: #fff; justify-content: center;
+    align-items: center; font-size: 14px; margin-right: 8px; flex-shrink: 0;
+  }
+  .step { display: flex; align-items: flex-start; margin: 10px 0; }
+  .step > div { flex: 1; }
+  a { color: #1b5e20; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <span class="badge">DEV × Sanity Challenge · Path Two: Vibe-Code Something Strange</span>
+  <h1>🌱 用 Sanity 做一个"快乐农场"小游戏</h1>
+  <p>从 0 到参赛作品 · 截止 2026-10-04 23:59 PDT（还剩约 5 天）</p>
+</header>
+
+<section>
+  <h2>一、先把 Sanity 是什么搞对</h2>
+  <p>你的理解大方向对，但有个关键区别：<strong>Sanity 不是"数据湖"，而是一个 Headless CMS（无头内容管理系统）</strong>。它的官方术语叫 <strong>Content Lake（内容湖）</strong>。核心由三块组成：</p>
+  <table>
+    <tr><th>组件</th><th>是什么</th><th>对应到你的农场游戏</th></tr>
+    <tr><td><strong>Content Lake</strong></td><td>Sanity 托管的云端 JSON 文档数据库（免费额度对个人项目足够）</td><td>存放所有玩家、作物、土地、游戏规则文档</td></tr>
+    <tr><td><strong>Studio</strong></td><td>官方提供的后台编辑界面（React 写的，脚手架一键生成），你在浏览器里可视化地增删改数据</td><td>你的"农场管理员后台"——可以直接在网页后台手动种一棵菜、改玩家等级、调规则参数</td></tr>
+    <tr><td><strong>Schema</strong></td><td>用 TypeScript 定义的数据结构（相当于"建表"），存在你自己的代码仓库里</td><td>定义"作物"有哪些字段、"土地"有哪些字段</td></tr>
+    <tr><td><strong>GROQ</strong></td><td>Sanity 的查询语言（类似 SQL/GraphQL），从游戏前端查询 Content Lake 里的数据</td><td><code>*[_type == "crop"]</code> 查所有作物</td></tr>
+  </table>
+  <div class="tip">
+    <strong>你的农场游戏为什么适合 Sanity：</strong>作物图鉴、土地类型、游戏规则本质是"结构化内容"，正是 Sanity 的强项。游戏前端通过 Sanity 的 API 读规则（GROQ 查询）、写玩家状态（API mutation），而 Studio 白送你一个可视化后台——这在 demo 展示时非常加分。
+  </div>
+</section>
+
+<section>
+  <h2>二、比赛要求（重要）</h2>
+  <ul>
+    <li>赛道二 "Vibe-code something strange"：用 AI 辅助提示词写出一个<strong>真正能用</strong>的应用，且内容要真实存在 Sanity Content Lake 里（不是 mock 数据）。</li>
+    <li><strong>提交必须包含你的 Sanity project ID 或公开 dataset 链接</strong>——评委要看你的结构化内容建模。别跳过这条。</li>
+    <li>提交方式：在 DEV 上发布文章（用官方 submission template），标签打 <code>#sanitychallenge</code>。</li>
+    <li>截止日期：<strong>2026 年 10 月 4 日 23:59 PDT</strong>。</li>
+  </ul>
+  <div class="note">⏰ 时间很紧：建议按下面路线走，第一版砍掉花哨功能，保证"数据在 Sanity + 游戏能跑"这条主线先通。</div>
+</section>
+
+<section>
+  <h2>三、需要安装的工具</h2>
+  <ol>
+    <li><strong>Node.js 18+</strong>（<a href="https://nodejs.org">nodejs.org</a> 下载 LTS 版）——Sanity CLI 和所有脚手架都基于它。装完在终端确认：<code>node -v</code></li>
+    <li><strong>Sanity 免费账号</strong> ——去 <a href="https://www.sanity.io">sanity.io</a> 用 GitHub/Google 登录，免费计划（Free）对参赛绰绰有余。</li>
+    <li><strong>VS Code</strong> ——写代码 + 装一个 GitHub Copilot / Cursor / 或直接用 Kimi Code 这类 AI 助手做 vibe coding。</li>
+    <li><strong>Sanity CLI</strong> ——不需要单独装，脚手架命令会自动调用。</li>
+    <li><strong>Git</strong> + 一个 GitHub 仓库（提交文章时需要贴代码链接，也方便你让 AI 工具协作）。</li>
+  </ol>
+</section>
+
+<section>
+  <h2>四、实现路径（约 4 步 + 1 个进阶）</h2>
+
+  <div class="step"><span class="step-num">1</span><div>
+    <h3>创建 Sanity 项目（10 分钟）</h3>
+    <pre><code>mkdir happy-farm && cd happy-farm
+npm create sanity@latest</code></pre>
+    <p>向导会让你登录、创建 project、选模板（选 <code>Clean project with no predefined schemas</code>）、选 dataset（用默认 <code>production</code>）。完成后运行 <code>npm run dev</code>，打开 <code>http://localhost:3333</code> 就是空的 Studio 后台。</p>
+  </div></div>
+
+  <div class="step"><span class="step-num">2</span><div>
+    <h3>设计 Schema —— 这是评委最想看的部分（1~2 小时）</h3>
+    <p>在 <code>schemaTypes/</code> 下定义四类文档，示例如下（作物）：</p>
+    <pre><code>// schemaTypes/crop.ts
+export default {
+  name: 'crop',
+  title: '作物',
+  type: 'document',
+  fields: [
+    { name: 'name',   title: '名称',   type: 'string' },
+    { name: 'emoji',  title: '图标',   type: 'string' },
+    { name: 'growTime', title: '生长时长(秒)', type: 'number' },
+    { name: 'sellPrice', title: '售价(金币)', type: 'number' },
+    { name: 'seedPrice', title: '种子价格', type: 'number' },
+  ],
+}</code></pre>
+    <p>其余三个文档类型：</p>
+    <ul>
+      <li><code>player</code>：玩家 —— 昵称、等级(level)、经验值(xp)、金币(coins)、<code>reference</code> 到作物图鉴</li>
+      <li><code>plot</code>：土地 —— 编号、所属玩家(reference)、当前作物(reference)、种植时间、状态(生长中/成熟/枯萎)</li>
+      <li><code>gameRule</code>：游戏规则 —— 升级所需经验公式、离线生长开关、偷窃/浇水规则等<strong>参数</strong>，存成数据而不是写死在前端代码里</li>
+    </ul>
+    <div class="tip">✨ 加分点：把<strong>游戏规则做成 schema 里的文档</strong>（比如"胡萝卜成熟需要 60 秒"），游戏前端通过 GROQ 实时读取。这样你可以在 Studio 后台改数字，游戏行为立刻变化——这在文章里是个很好的故事："游戏规则本身也是内容"。</div>
+  </div></div>
+
+  <div class="step"><span class="step-num">3</span><div>
+    <h3>写游戏前端（vibe coding 主战场，2~3 天）</h3>
+    <p>技术栈任选，推荐 <strong>Vite + React</strong>（AI 工具最熟、跑得快）。用 AI 助手生成一个农场网格界面：点击空地 → 弹出选种子 → 显示生长倒计时 → 成熟后点击收获 → 金币/经验增加。</p>
+    <p>前端与 Sanity 的连接用官方 JS 客户端：</p>
+    <pre><code>npm install @sanity/client
+
+// lib/sanity.ts
+import { createClient } from '@sanity/client'
+export const client = createClient({
+  projectId: '你的项目ID',
+  dataset: 'production',
+  useCdn: true,
+  token: '带写权限的API token', // 写操作需要
+})</code></pre>
+    <p><strong>读</strong>（GROQ 查询）：</p>
+    <pre><code>// 查所有作物图鉴
+const crops = await client.fetch(`*[_type == "crop"]`)
+
+// 查当前玩家的所有土地及其作物信息（reference 自动 join）
+const plots = await client.fetch(
+  `*[_type == "plot" && player._ref == $pid]{
+     plotId, plantedAt, status,
+     crop->{ name, emoji, growTime, sellPrice }
+   }`, { pid: playerId })
+
+// 查游戏规则（游戏行为由数据驱动）
+const rules = await client.fetch(`*[_type == "gameRule"][0]`)</code></pre>
+    <p><strong>写</strong>（玩家操作实时回写 Content Lake）：</p>
+    <pre><code>// 收获：更新金币和经验
+client.patch(playerId)
+  .inc({ coins: crop.sellPrice, xp: 10 })
+  .commit()
+
+// 播种：更新土地状态
+client.patch(plotId)
+  .set({ crop: {_type:'reference', _ref: cropId}, plantedAt: new Date().toISOString() })
+  .commit()</code></pre>
+    <div class="note">⚠️ 真实 token 放前端会泄露——参赛 demo 可以接受，但更正规的做法是写一个 Netlify/Vercel serverless function 做中转，顺便作为文章的工程亮点。</div>
+  </div></div>
+
+  <div class="step"><span class="step-num">4</span><div>
+    <h3>部署 + 写文章提交（1 天）</h3>
+    <ul>
+      <li>Studio 部署：<code>npx sanity deploy</code>，免费得到 <code>https://你的项目.sanity.studio</code> 的线上后台。</li>
+      <li>游戏部署：Vercel / Netlify 一键（免费）。</li>
+      <li>在 Studio 里手动录入几条作物、一个玩家、几块地（这是"种子内容"）。</li>
+      <li>按 DEV 官方模板写文章：项目灵感、schema 设计思路、遇到的坑、截图/GIF、demo 链接、<strong>GitHub 仓库链接</strong>、<strong>Sanity project ID</strong>（这条必填）。</li>
+    </ul>
+  </div></div>
+
+  <div class="step"><span class="step-num">★</span><div>
+    <h3>进阶亮点（时间够再做）</h3>
+    <ul>
+      <li><strong>实时同步</strong>：Sanity 支持实时监听（listen），开两个浏览器窗口种/收，另一个窗口自动刷新——demo 效果惊艳。</li>
+      <li><strong>"小偷"功能</strong>：允许偷好友成熟的菜（再加一个 <code>friend</code> 文档 + 规则参数），契合"strange"主题。</li>
+      <li><strong>作物图片用 Sanity 的 asset 存储</strong>，而不是 emoji。</li>
+    </ul>
+  </div></div>
+</section>
+
+<section>
+  <h2>五、最终效果长什么样</h2>
+  <ul>
+    <li><strong>玩家视角</strong>：打开部署好的网页 → 一个卡通农场网格（比如 3×3 块地）→ 点击空地选种子播种 → 每块地显示实时倒计时（"胡萝卜 · 还剩 42 秒"）→ 成熟后点击收获，金币 +15、经验 +10 → 经验满自动升级，解锁新作物。</li>
+    <li><strong>管理员视角（Studio）</strong>：浏览器打开 <code>xxx.sanity.studio</code>，左侧导航能看到 作物 / 玩家 / 土地 / 游戏规则 四类文档 → 你可以把"胡萝卜成熟时间"从 60 秒改成 5 秒，游戏里立刻生效 → 还能直接在后台"手动"给玩家发 9999 金币。</li>
+    <li><strong>评委视角</strong>：读你的文章 → 点 demo 链接玩两下 → 打开你的 project ID 查看 Content Lake 里真实的结构化数据 → 看到你的游戏规则也是数据驱动的、schema 设计有参考和嵌套关系。这就是获奖画像。</li>
+  </ul>
+</section>
+
+<section>
+  <h2>六、建议的时间表（以今天 9/29 起算）</h2>
+  <table>
+    <tr><th>日期</th><th>任务</th></tr>
+    <tr><td>9/29（今天）</td><td>装 Node、注册 Sanity、跑通 <code>npm create sanity@latest</code>，看到空 Studio</td></tr>
+    <tr><td>9/30</td><td>写完 4 个 schema，录入种子数据，用 Vision 工具（Studio 自带）试验 GROQ 查询</td></tr>
+    <tr><td>10/1 – 10/2</td><td>vibe code 游戏前端：读数据渲染农场 → 实现播种/收获写回 Sanity</td></tr>
+    <tr><td>10/3</td><td>部署游戏 + Studio，录 GIF，按模板写文章</td></tr>
+    <tr><td>10/4</td><td>中午前提交（留出 buffer），发布到 DEV 并打 <code>#sanitychallenge</code> 标签</td></tr>
+  </table>
+</section>
+
+</div>
+</body>
+</html>

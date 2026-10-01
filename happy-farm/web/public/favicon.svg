@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#57b6ea"/>
+      <stop offset="1" stop-color="#b7e6fb"/>
+    </linearGradient>
+    <linearGradient id="grass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a4dc6f"/>
+      <stop offset="1" stop-color="#5da738"/>
+    </linearGradient>
+    <linearGradient id="soil" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b1804e"/>
+      <stop offset="1" stop-color="#7a4c26"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#sky)"/>
+  <path d="M0 40h64v10a14 14 0 0 1-14 14H14A14 14 0 0 1 0 50z" fill="url(#grass)"/>
+  <ellipse cx="32" cy="45" rx="21" ry="9" fill="url(#soil)"/>
+  <ellipse cx="32" cy="45" rx="21" ry="9" fill="none" stroke="#5a3517" stroke-width="2"/>
+  <path d="M32 42V24" stroke="#3f7f27" stroke-width="4" stroke-linecap="round"/>
+  <path d="M32 32c-9 0-13-5-13-11 7 0 12 4 13 11z" fill="#7cc94b"/>
+  <path d="M32 28c9 0 13-5 13-11-7 0-12 4-13 11z" fill="#5fae37"/>
+  <circle cx="32" cy="22" r="7" fill="#ffcf3f" stroke="#c9880f" stroke-width="2"/>
+  <circle cx="29.5" cy="19.5" r="2" fill="#fff3bd" opacity=".9"/>
+</svg>
