@@ -20,6 +20,7 @@ export interface Player {
   xp: number
   coins: number
   stolenToday?: number
+  authId?: string
 }
 
 export interface Plot {

@@ -13,7 +13,7 @@ import './App.css'
 
 let floaterId = 0
 
-export default function App() {
+export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
   const [crops, setCrops] = useState<Crop[]>([])
   const [players, setPlayers] = useState<Player[]>([])
   const [playerId, setPlayerId] = useState<string>('')
@@ -72,14 +72,15 @@ export default function App() {
   useEffect(() => {
     refresh('')
       .then((playerList) => {
-        setPlayerId(playerList[0]?._id ?? '')
+        // 登录模式直接玩自己的号；演示模式默认第一个玩家
+        setPlayerId(forcedPlayerId ?? playerList[0]?._id ?? '')
         setLoading(false)
       })
       .catch((e) => {
         setError(String(e?.message ?? e))
         setLoading(false)
       })
-  }, [refresh])
+  }, [refresh, forcedPlayerId])
 
   useEffect(() => {
     if (!playerId) return
@@ -331,6 +332,8 @@ export default function App() {
         readyCount={readyItems.length}
         stolenToday={player.stolenToday ?? 0}
         stolenLimit={rule?.stealDailyLimit ?? 5}
+        showSwitch={!forcedPlayerId}
+        showUserButton={!!forcedPlayerId}
         onSwitchPlayer={setPlayerId}
         onOpenShop={openGeneralShop}
         onToast={showToast}

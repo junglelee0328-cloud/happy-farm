@@ -30,3 +30,31 @@
 - Skill-Path: ~/.agents/skills/game-scene-svg-art/SKILL.md
 
 ---
+
+## [LRN-20261002-001] knowledge_gap
+
+**Logged**: 2026-10-02T00:30:00+08:00
+**Priority**: medium
+**Status**: resolved
+**Area**: infra
+
+### Summary
+Sanity 项目部署到线上域名后浏览器报 `net::ERR_FAILED`（Failed to fetch），原因是 Sanity 的 CORS 白名单默认只含 localhost，需为线上域名添加 origin。
+
+### Details
+前端从 `https://xxx.vercel.app` 直接调 `*.api.sanity.io`，Chrome 表现为 `net::ERR_FAILED`（控制台没有明显的 CORS 字样，容易误判为网络问题）。检查方法：`npx sanity cors list`。
+
+### Suggested Action
+部署前端后立即执行：
+```bash
+npx sanity cors add https://<线上域名> --credentials
+npx sanity cors add "https://*.vercel.app" --credentials --yes  # 覆盖 Vercel 预览部署
+```
+验证：`curl -D - -H "Origin: <域名>" <api-url>` 应返回匹配的 `access-control-allow-origin`。
+
+### Metadata
+- Source: error
+- Related Files: happy-farm/web/src/lib/sanity.ts
+- Tags: sanity, cors, vercel, deploy
+
+---

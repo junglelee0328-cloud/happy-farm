@@ -1,5 +1,6 @@
 import type {Player} from '../types'
 import {levelForXp} from '../lib/growth'
+import {UserButton} from '@clerk/clerk-react'
 
 interface Props {
   player: Player
@@ -8,6 +9,8 @@ interface Props {
   readyCount: number
   stolenToday: number
   stolenLimit: number
+  showSwitch?: boolean
+  showUserButton?: boolean
   onSwitchPlayer: (id: string) => void
   onOpenShop: () => void
   onToast: (msg: string) => void
@@ -20,6 +23,8 @@ export default function TopBar({
   readyCount,
   stolenToday,
   stolenLimit,
+  showSwitch = true,
+  showUserButton = false,
   onSwitchPlayer,
   onOpenShop,
   onToast,
@@ -38,7 +43,7 @@ export default function TopBar({
           <div className="name-row">
             <span className="nickname">{player.nickname}</span>
             <span className="role-tag">农场主</span>
-            {players.length > 1 && (
+            {showSwitch && players.length > 1 && (
               <select
                 className="player-switch"
                 value={player._id}
@@ -107,6 +112,7 @@ export default function TopBar({
         <button className="icon-btn" onClick={() => onToast('📖 玩法说明：浇水加速 · 除草除虫 · 成熟快收')} title="帮助">
           ❔
         </button>
+        {showUserButton && <UserButton afterSignOutUrl="/" />}
       </section>
     </header>
   )
