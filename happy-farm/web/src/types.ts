@@ -29,7 +29,10 @@ export interface Plot {
   _id: string
   index: number
   unlockLevel?: number
-  tier?: LandTier
+  /** 玩家等级达到后这块地升级为红土地 */
+  redLevel?: number
+  /** 玩家等级达到后这块地升级为黑土地 */
+  blackLevel?: number
   crop?: Crop
   plantedAt?: string
   status: 'empty' | 'growing' | 'ready' | 'withered'

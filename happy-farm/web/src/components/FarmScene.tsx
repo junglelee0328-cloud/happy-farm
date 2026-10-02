@@ -1,7 +1,7 @@
 import {memo, useEffect, useMemo, useRef, useState} from 'react'
 import type {ReactNode} from 'react'
 import type {GrowthState} from '../lib/growth'
-import {formatCountdown, TIER_INFO, tierSpeedBoost, tierYieldBoost} from '../lib/growth'
+import {formatCountdown, effectiveTier, TIER_INFO, tierSpeedBoost, tierYieldBoost} from '../lib/growth'
 import type {Crop, GameRule, Player, Plot} from '../types'
 import {BASE_VIEW, TILE_H, TILE_W, coverView, plotAnchor, round} from '../lib/iso'
 import CropArt, {WM_CLIP_ID, WitheredArt} from '../art/CropArt'
@@ -375,7 +375,7 @@ export default function FarmScene({
                 index={plot.index}
                 locked={player.level < (plot.unlockLevel ?? 1)}
                 unlockLevel={plot.unlockLevel ?? 1}
-                tier={plot.tier ?? 'normal'}
+                tier={effectiveTier(plot, player.level)}
                 cropId={plot.crop?._id ?? ''}
                 cropName={plot.crop?.name ?? ''}
                 emoji={plot.crop?.emoji}
@@ -609,12 +609,25 @@ function PlotTip({
         {plot.crop && <span className="tip-crop">{plot.crop.name}</span>}
       </div>
       <div className="tip-sub">{statusText}</div>
-      {(plot.tier ?? 'normal') !== 'normal' && (
-        <div className="tip-sub">
-          {TIER_INFO[plot.tier ?? 'normal'].emoji} {TIER_INFO[plot.tier ?? 'normal'].label}
-          {' '}· 产量+{Math.round(tierYieldBoost(plot.tier, rule ?? null) * 100)}% · 生长+{Math.round(tierSpeedBoost(plot.tier, rule ?? null) * 100)}%
-        </div>
-      )}
+      {(() => {
+        const t = effectiveTier(plot, player.level)
+        const yPct = Math.round(tierYieldBoost(t, rule ?? null) * 100)
+        const sPct = Math.round(tierSpeedBoost(t, rule ?? null) * 100)
+        const nextLevel = t === 'normal' ? plot.redLevel : t === 'red' ? plot.blackLevel : undefined
+        const nextLabel = t === 'normal' ? '🟥 红土地' : '⬛ 黑土地'
+        return (
+          <>
+            {t !== 'normal' && (
+              <div className="tip-sub">
+                {TIER_INFO[t].emoji} {TIER_INFO[t].label} · 产量+{yPct}% · 生长+{sPct}%
+              </div>
+            )}
+            {nextLevel != null && (
+              <div className="tip-sub">⏫ Lv.{nextLevel} 起这块地升级为{nextLabel}</div>
+            )}
+          </>
+        )
+      })()}
       {growth.status === 'growing' && (
         <div className="tip-progress">
           <div className="tip-progress-fill" style={{width: `${growth.progress * 100}%`}} />

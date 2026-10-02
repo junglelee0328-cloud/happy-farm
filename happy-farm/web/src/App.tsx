@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {client} from './lib/sanity'
-import {computeGrowth, levelForXp, tierYieldBoost} from './lib/growth'
+import {computeGrowth, effectiveTier, levelForXp, tierYieldBoost} from './lib/growth'
 import type {Crop, GameRule, Player, Plot} from './types'
 import {plotAnchor} from './lib/iso'
 import FarmScene from './components/FarmScene'
@@ -113,11 +113,14 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
   }, [friendId])
 
   const friendGrown = useMemo(
-    () => friendPlots.map((plot) => ({plot, growth: computeGrowth(plot, rule, clock)})),
-    [friendPlots, rule, clock],
+    () => friendPlots.map((plot) => ({plot, growth: computeGrowth(plot, rule, clock, effectiveTier(plot, friend?.level ?? 1))})),
+    [friendPlots, rule, clock, friend?.level],
   )
 
-  const grown = useMemo(() => plots.map((plot) => ({plot, growth: computeGrowth(plot, rule, clock)})), [plots, rule, clock])
+  const grown = useMemo(
+    () => plots.map((plot) => ({plot, growth: computeGrowth(plot, rule, clock, effectiveTier(plot, player?.level ?? 1))})),
+    [plots, rule, clock, player?.level],
+  )
 
   const readyItems = grown.filter((g) => g.growth.status === 'ready' && g.plot.crop)
   const thirstyItems = grown.filter((g) => g.growth.status === 'growing' && !g.plot.isWatered && !g.plot.hasBug)
@@ -183,7 +186,7 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
     run(async () => {
       const crop = plot.crop
       if (!player || !crop) throw new Error('这块地没有作物')
-      const yieldCoins = Math.round(crop.sellPrice * (1 + tierYieldBoost(plot.tier, rule)))
+      const yieldCoins = Math.round(crop.sellPrice * (1 + tierYieldBoost(effectiveTier(plot, player.level), rule)))
       const newXp = player.xp + crop.exp
       const {level} = levelForXp(newXp, rule)
       const leveledUp = level > player.level
@@ -254,7 +257,7 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
         const crop = plot.crop
         if (!crop) continue
         xpGain += crop.exp
-        const yieldCoins = Math.round(crop.sellPrice * (1 + tierYieldBoost(plot.tier, rule)))
+        const yieldCoins = Math.round(crop.sellPrice * (1 + tierYieldBoost(effectiveTier(plot, player.level), rule)))
         coins += yieldCoins
         addFloater(plot.index, `+${yieldCoins} 💰`, 'coin')
         tx.patch(plot._id, (p) =>

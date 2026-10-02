@@ -18,6 +18,13 @@ export const TIER_INFO: Record<LandTier, {label: string; emoji: string}> = {
   black: {label: '黑土地', emoji: '⬛'},
 }
 
+/** 一块地在某个玩家等级下的实际等级：普通 → 红土 → 黑土，随等级自动升级 */
+export function effectiveTier(plot: Pick<Plot, 'redLevel' | 'blackLevel'>, ownerLevel: number): LandTier {
+  if (plot.blackLevel != null && ownerLevel >= plot.blackLevel) return 'black'
+  if (plot.redLevel != null && ownerLevel >= plot.redLevel) return 'red'
+  return 'normal'
+}
+
 export function tierSpeedBoost(tier: LandTier | undefined, rule: GameRule | null): number {
   if (tier === 'red') return rule?.redSpeedBoost ?? 0
   if (tier === 'black') return rule?.blackSpeedBoost ?? 0
@@ -38,13 +45,13 @@ export function tierYieldBoost(tier: LandTier | undefined, rule: GameRule | null
  * - 害虫：生长完全暂停，需要手动除虫
  * - 成熟后超过 witherAfter 秒不收获 → 枯萎
  */
-export function computeGrowth(plot: Plot, rule: GameRule | null, now = Date.now()): GrowthState {
+export function computeGrowth(plot: Plot, rule: GameRule | null, now = Date.now(), tier: LandTier = 'normal'): GrowthState {
   const empty: GrowthState = {status: 'empty', progress: 0, secondsLeft: 0, stageEmoji: '🟫', readySinceSeconds: 0}
   if (!plot.crop || !plot.plantedAt) return empty
 
   const growTime = plot.crop.growTime
   const boost = plot.isWatered ? (rule?.waterSpeedBoost ?? 0) : 0
-  const effectiveGrowTime = growTime / ((1 + boost) * (1 + tierSpeedBoost(plot.tier, rule)))
+  const effectiveGrowTime = growTime / ((1 + boost) * (1 + tierSpeedBoost(tier, rule)))
 
   let rate = 1
   if (plot.hasBug) rate = 0

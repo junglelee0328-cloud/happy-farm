@@ -57,12 +57,13 @@ const xpToNextLevel = Array.from({length: 99}, (_, i) => ({
   xpNeeded: Math.round(40 * (i + 1) ** 2.2),
 }))
 
-// ===== 3. 土地等级表：index → [tier, unlockLevel] =====
-const PLOT_TIERS = [
-  ...Array.from({length: 8}, (_, i) => ['normal', [1, 1, 1, 1, 1, 1, 2, 3][i]]),
-  ['red', 8], ['red', 12], ['red', 16], ['red', 20], ['red', 25], ['red', 30], ['red', 35], ['red', 40],
-  ['black', 45], ['black', 52], ['black', 60], ['black', 68], ['black', 76], ['black', 84], ['black', 92], ['black', 100],
-]
+// ===== 3. 土地三级制：同一块地随等级升级 =====
+// 普通土地 Lv.25 开满 → 红土地 Lv.60 开满 → 黑土地 Lv.100 开满
+const plotLevels = (i) => ({
+  unlockLevel: 1 + Math.round(((i - 1) * 24) / 23),
+  redLevel: 26 + Math.round(((i - 1) * 34) / 23),
+  blackLevel: 61 + Math.round(((i - 1) * 39) / 23),
+})
 
 async function main() {
   // 新作物
@@ -84,15 +85,14 @@ async function main() {
     .commit()
   console.log('✓ 经验曲线（100 级）+ 红土/黑土加成已写入 rule-main')
 
-  // 迁移所有土地（所有玩家）：按编号写入 tier 和 unlockLevel
+  // 迁移所有土地（所有玩家）：按编号写入三级阈值，清掉旧的 tier 字段
   const plots = await client.fetch('*[_type == "plot"]{_id, index}')
   tx = client.transaction()
   for (const p of plots) {
-    const [tier, unlockLevel] = PLOT_TIERS[p.index - 1] ?? ['normal', 1]
-    tx.patch(p._id, (patch) => patch.set({tier, unlockLevel}))
+    tx.patch(p._id, (patch) => patch.set(plotLevels(p.index)).unset(['tier']))
   }
   await tx.commit()
-  console.log(`✓ ${plots.length} 块土地已按三级制迁移（普通/红土/黑土）`)
+  console.log(`✓ ${plots.length} 块土地已按三级制迁移（普通25级开满 / 红土60级 / 黑土100级）`)
 }
 
 main().catch((e) => {

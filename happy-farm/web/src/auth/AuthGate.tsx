@@ -4,8 +4,12 @@ import {client} from '../lib/sanity'
 
 const AVATARS = ['🧑‍🌾', '👨‍🌾', '👩‍🌾', '🧑‍🌻', '🐮', '🐰', '🐥', '🦊']
 
-/** 和 Studio 种子数据一致的土地解锁规则 */
-const unlockLevel = (i: number) => (i <= 6 ? 1 : Math.floor((i - 7) / 2) + 2)
+/** 土地三级阈值：普通 Lv.25 开满 → 红土 Lv.60 → 黑土 Lv.100 */
+const plotLevels = (i: number) => ({
+  unlockLevel: 1 + Math.round(((i - 1) * 24) / 23),
+  redLevel: 26 + Math.round(((i - 1) * 34) / 23),
+  blackLevel: 61 + Math.round(((i - 1) * 39) / 23),
+})
 
 /**
  * 首次登录时建档：创建玩家文档 + 24 块地。
@@ -35,7 +39,7 @@ async function ensurePlayer(userId: string, nickname: string): Promise<string> {
       _id: `${playerId}-plot-${i}`,
       _type: 'plot',
       index: i,
-      unlockLevel: unlockLevel(i),
+      ...plotLevels(i),
       owner: {_type: 'reference', _ref: playerId},
       status: 'empty',
     })
