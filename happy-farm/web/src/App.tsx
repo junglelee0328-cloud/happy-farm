@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {client} from './lib/sanity'
 import {computeGrowth, effectiveTier, levelForXp, tierYieldBoost} from './lib/growth'
-import type {Crop, Fertilizer, GameRule, Player, Plot} from './types'
+import type {Crop, Fertilizer, GameRule, Player} from './types'
 import {plotAnchor} from './lib/iso'
 import FarmScene from './components/FarmScene'
 import type {Floater, PlotWithCrop} from './components/FarmScene'
@@ -28,7 +28,6 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState('')
   const [toastKind, setToastKind] = useState<'info' | 'good' | 'bad'>('info')
-  const [shopPlotId, setShopPlotId] = useState<string | null>(null)
   const [shopOpen, setShopOpen] = useState(false)
   const [seedId, setSeedId] = useState('')
   const [floaters, setFloaters] = useState<Floater[]>([])
@@ -153,11 +152,20 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
   const plant = (plot: PlotWithCrop, crop: Crop) =>
     run(async () => {
       if (!player) throw new Error(t('err.noPlayer'))
-      if (player.coins < crop.seedPrice) throw new Error(t('err.noCoins'))
       if (player.level < crop.minLevel) throw new Error(t('err.needLevel', {n: crop.minLevel, name: lname(crop, lang)}))
+      const inv = player.inventory ?? []
+      const entry = inv.find((e) => e.item?._id === crop._id)
+      if (!entry || entry.count <= 0) throw new Error(t('err.noSeed', {name: lname(crop, lang)}))
+      const newInv = inv
+        .map((e) => ({
+          _key: e._key,
+          item: e.item ? {_type: 'reference' as const, _ref: e.item._id} : undefined,
+          count: e.item?._id === crop._id ? e.count - 1 : e.count,
+        }))
+        .filter((e) => e.count > 0)
       await client
         .transaction()
-        .patch(player._id, (p) => p.dec({coins: crop.seedPrice}))
+        .patch(player._id, (p) => p.set({inventory: newInv}))
         .patch(plot._id, (p) =>
           p
             .set({
@@ -171,8 +179,29 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
             .unset(['stolenBy', 'fertilizer']),
         )
         .commit()
-      addFloater(plot.index, `-${crop.seedPrice} 💰`, 'xp')
+      addFloater(plot.index, `${crop.emoji ?? '🌱'}`, 'xp')
       return t('toast.planted', {name: lname(crop, lang)})
+    }, '')
+
+  // 🛒 商店购买：任意数量，只受金币限制，全部进背包
+  const buyItem = (item: Crop | Fertilizer, qty: number, unitPrice: number) =>
+    run(async () => {
+      if (!player) throw new Error(t('err.noPlayer'))
+      const total = unitPrice * qty
+      if (player.coins < total) throw new Error(t('err.noCoins'))
+      const inv = (player.inventory ?? []).map((e) => ({
+        _key: e._key,
+        item: e.item ? {_type: 'reference' as const, _ref: e.item._id} : undefined,
+        count: e.count,
+      }))
+      const idx = inv.findIndex((e) => e.item?._ref === item._id)
+      if (idx >= 0) inv[idx] = {...inv[idx], count: inv[idx].count + qty}
+      else inv.push({_key: `inv-${item._id}`, item: {_type: 'reference' as const, _ref: item._id}, count: qty})
+      await client
+        .transaction()
+        .patch(player._id, (p) => p.dec({coins: total}).set({inventory: inv}))
+        .commit()
+      return t(item._type === 'crop' ? 'toast.buySeed' : 'toast.buyFert', {name: lname(item, lang), n: qty})
     }, '')
 
   const water = (plot: PlotWithCrop) =>
@@ -180,26 +209,6 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
       await client.patch(plot._id).set({isWatered: true}).commit()
       addFloater(plot.index, '💧 加速中', 'xp', -26)
     }, t('toast.watered'))
-
-  // 🧪 化肥：商店买入背包
-  const buyFert = (fert: Fertilizer) =>
-    run(async () => {
-      if (!player) throw new Error(t('err.noPlayer'))
-      if (player.coins < fert.price) throw new Error(t('err.fertPoor', {name: lname(fert, lang), price: fert.price}))
-      const inv = (player.inventory ?? []).map((e) => ({
-        _key: e._key,
-        item: e.item ? {_type: 'reference' as const, _ref: e.item._id} : undefined,
-        count: e.count,
-      }))
-      const idx = inv.findIndex((e) => e.item?._ref === fert._id)
-      if (idx >= 0) inv[idx] = {...inv[idx], count: inv[idx].count + 1}
-      else inv.push({_key: `fert-${fert._id}`, item: {_type: 'reference' as const, _ref: fert._id}, count: 1})
-      await client
-        .transaction()
-        .patch(player._id, (p) => p.dec({coins: fert.price}).set({inventory: inv}))
-        .commit()
-      return t('toast.buyFert', {name: lname(fert, lang)})
-    }, '')
 
   // 背包化肥 → 点到生长中的地上
   const useFertilizer = (plot: PlotWithCrop) =>
@@ -349,15 +358,11 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
       return t('toast.waterAll', {n: thirstyItems.length})
     }, '')
 
-  const openShopForPlot = (plot: PlotWithCrop) => {
-    setShopPlotId(plot._id)
+  const openShopForPlot = (_plot: PlotWithCrop) => {
     setShopOpen(true)
   }
 
   const openGeneralShop = () => {
-    if (!player) return
-    const target = plots.find((p) => player.level >= (p.unlockLevel ?? 1) && !p.crop)
-    setShopPlotId(target?._id ?? null)
     setShopOpen(true)
   }
 
@@ -390,7 +395,6 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
   if (!player) return <div className="loading">{t('loading.noplayer')}</div>
 
   const levelInfo = levelForXp(player.xp, rule)
-  const shopPlot = (plots.find((p) => p._id === shopPlotId) ?? null) as Plot | null
 
   return (
     <div className="app">
@@ -466,7 +470,6 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
       </main>
 
       <Toolbar
-        crops={crops}
         player={player}
         selectedSeedId={seedId}
         readyCount={readyItems.length}
@@ -501,21 +504,13 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
 
       {shopOpen && (
         <ShopModal
-          plot={shopPlot}
           crops={crops}
           fertilizers={fertilizers}
           player={player}
+          emptyPlots={plots.filter((p) => player.level >= (p.unlockLevel ?? 1) && !p.crop).length}
           onClose={() => setShopOpen(false)}
-          onBuyFert={buyFert}
-          onPick={(crop) => {
-            const target = shopPlot ?? plots.find((p) => player.level >= (p.unlockLevel ?? 1) && !p.crop)
-            setShopOpen(false)
-            if (!target) {
-              showToast(t('toast.noEmptyPlot'), 'bad')
-              return
-            }
-            plant(target as PlotWithCrop, crop)
-          }}
+          onBuyCrop={(crop, qty) => buyItem(crop, qty, crop.seedPrice)}
+          onBuyFert={(fert, qty) => buyItem(fert, qty, fert.price)}
         />
       )}
     </div>

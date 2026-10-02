@@ -1534,6 +1534,83 @@
 }
 
 /* ==================================================================
+   购买行 / 背包
+   ================================================================== */
+
+.buy-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.qty-ctl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #f3e7cd;
+  border: 2px solid #c9a878;
+  border-radius: 999px;
+  padding: 2px 6px;
+}
+
+.qty-ctl button {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fffdf4;
+  border: 1.5px solid #c9a878;
+  font-size: 15px;
+  font-weight: 900;
+  color: #6b451f;
+  line-height: 1;
+}
+
+.qty-ctl button:hover:not(:disabled) {background: #ffe8b0;}
+.qty-ctl button:disabled {opacity: .4;}
+.qty-ctl b {min-width: 20px; text-align: center; font-size: 14px; color: #4a3418;}
+
+.buy-btn {
+  flex: 1 1 auto;
+  font-size: 13px;
+  font-weight: 900;
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #9ee063, #5cae2c 55%, #3f8a1c);
+  border: 2px solid #2f6a12;
+  box-shadow: 0 2px 0 #2f6a12;
+  text-shadow: 0 1px 0 rgba(47, 106, 18, 0.7);
+  white-space: nowrap;
+}
+
+.buy-btn:hover:not(:disabled) {transform: translateY(-1px);}
+.buy-btn:active:not(:disabled) {transform: translateY(1px); box-shadow: none;}
+.buy-btn:disabled {opacity: .5;}
+
+.buy-stock {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #a1865c;
+}
+
+.seed-chip.empty-hint {
+  border-style: dashed;
+  min-width: 140px;
+  flex-direction: row;
+  gap: 6px;
+  padding: 6px 12px;
+}
+
+.seed-chip.empty-hint .seed-name {font-size: 11px; color: #8a6a3a;}
+
+.bag-count {
+  font-size: 13px;
+  font-weight: 900;
+  color: #b58100;
+  white-space: nowrap;
+}
+
+/* ==================================================================
    自适应
    ================================================================== */
 

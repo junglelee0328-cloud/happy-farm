@@ -22,7 +22,7 @@ export default defineType({
         {
           type: 'object',
           fields: [
-            {name: 'item', title: '道具', type: 'reference', to: [{type: 'fertilizer'}]},
+            {name: 'item', title: '道具', type: 'reference', to: [{type: 'fertilizer'}, {type: 'crop'}]},
             {name: 'count', title: '数量', type: 'number'},
           ],
           preview: {

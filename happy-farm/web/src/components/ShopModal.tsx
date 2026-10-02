@@ -1,30 +1,93 @@
 import {useState} from 'react'
-import type {Crop, Fertilizer, Player, Plot} from '../types'
+import type {Crop, Fertilizer, Player} from '../types'
 import {formatCountdown} from '../lib/growth'
 import {lname, useT} from '../i18n'
 
 interface Props {
-  plot: Plot | null
   crops: Crop[]
   fertilizers: Fertilizer[]
   player: Player
+  /** 当前可用空地数（种子默认购买数量） */
+  emptyPlots: number
   onClose: () => void
-  onPick: (crop: Crop) => void
-  onBuyFert: (fert: Fertilizer) => void
+  onBuyCrop: (crop: Crop, qty: number) => void
+  onBuyFert: (fert: Fertilizer, qty: number) => void
 }
 
-export default function ShopModal({plot, crops, fertilizers, player, onClose, onPick, onBuyFert}: Props) {
+/** 单个商品卡：数量加减 + 购买 */
+function BuyCard({
+  emoji,
+  name,
+  desc,
+  stats,
+  unitPrice,
+  defaultQty,
+  stock,
+  maxAfford,
+  disabled,
+  lockText,
+  buyText,
+  stockText,
+  onBuy,
+}: {
+  emoji: string
+  name: string
+  desc: string
+  stats: string[]
+  unitPrice: number
+  defaultQty: number
+  stock: number
+  maxAfford: number
+  disabled: boolean
+  lockText?: string
+  buyText: string
+  stockText: (n: number) => string
+  onBuy: (qty: number) => void
+}) {
+  const [qty, setQty] = useState(() => Math.max(1, Math.min(defaultQty, maxAfford || 1)))
+  const max = Math.max(1, maxAfford)
+  const clamp = (n: number) => Math.max(1, Math.min(max, n))
+  return (
+    <div className={`seed-card buy-card ${disabled ? 'disabled' : ''}`}>
+      <div className="seed-card-top">
+        <span className="seed-card-emoji">{emoji}</span>
+        <div className="seed-card-name">
+          <b>{name}</b>
+          <i>{desc}</i>
+        </div>
+      </div>
+      <div className="seed-card-stats">
+        {stats.map((s, i) => (
+          <span key={i}>{s}</span>
+        ))}
+      </div>
+      <div className="buy-row">
+        <div className="qty-ctl">
+          <button disabled={disabled || qty <= 1} onClick={() => setQty(clamp(qty - 1))}>−</button>
+          <b>{qty}</b>
+          <button disabled={disabled || qty >= max} onClick={() => setQty(clamp(qty + 1))}>＋</button>
+        </div>
+        <button className="buy-btn" disabled={disabled} onClick={() => onBuy(qty)}>
+          {buyText} · {unitPrice * qty}💰
+        </button>
+      </div>
+      <div className="buy-stock">{stockText(stock)}</div>
+      {lockText && <span className="lock-ribbon">{lockText}</span>}
+    </div>
+  )
+}
+
+export default function ShopModal({crops, fertilizers, player, emptyPlots, onClose, onBuyCrop, onBuyFert}: Props) {
   const {t, lang} = useT()
   const [tab, setTab] = useState<'seeds' | 'ferts'>('seeds')
+  const stockOf = (id: string) => player.inventory?.find((e) => e.item?._id === id)?.count ?? 0
 
   return (
     <div className="modal-mask" onClick={onClose}>
       <div className="shop" onClick={(e) => e.stopPropagation()}>
         <div className="shop-head">
           <h3>{tab === 'seeds' ? t('shop.title') : t('shop.titleFert')}</h3>
-          <span className="shop-sub">
-            {plot && tab === 'seeds' ? t('shop.sub', {n: plot.index, coins: player.coins}) : t('shop.subGeneral')}
-          </span>
+          <span className="shop-sub">{t('shop.subGeneral')}</span>
           <div className="shop-coins">
             💰 <b>{player.coins.toLocaleString()}</b>
           </div>
@@ -46,71 +109,51 @@ export default function ShopModal({plot, crops, fertilizers, player, onClose, on
           <div className="shop-grid">
             {crops.map((crop) => {
               const locked = player.level < crop.minLevel
-              const poor = player.coins < crop.seedPrice
-              const disabled = locked || poor
-              const profit = crop.sellPrice - crop.seedPrice
+              const maxAfford = Math.floor(player.coins / crop.seedPrice)
               return (
-                <button
+                <BuyCard
                   key={crop._id}
-                  className={`seed-card ${disabled ? 'disabled' : ''}`}
-                  disabled={disabled}
-                  onClick={() => onPick(crop)}
-                >
-                  <div className="seed-card-top">
-                    <span className="seed-card-emoji">{crop.emoji ?? '🌱'}</span>
-                    <div className="seed-card-name">
-                      <b>{lname(crop, lang)}</b>
-                      <i>{crop.description ?? ''}</i>
-                    </div>
-                  </div>
-                  <div className="seed-card-stats">
-                    <span>⏱ {formatCountdown(crop.growTime)}</span>
-                    <span>✨ {crop.exp} XP</span>
-                  </div>
-                  <div className="seed-card-foot">
-                    <span className="price">
-                      <span className="coin-mini">🪙</span>
-                      {crop.seedPrice}
-                    </span>
-                    <span className="profit">+{profit}</span>
-                  </div>
-                  {locked && <span className="lock-ribbon">{t('shop.locked', {n: crop.minLevel})}</span>}
-                  {!locked && poor && <span className="lock-ribbon poor">💰</span>}
-                </button>
+                  emoji={crop.emoji ?? '🌱'}
+                  name={lname(crop, lang)}
+                  desc={crop.description ?? ''}
+                  stats={[`⏱ ${formatCountdown(crop.growTime)}`, `✨ ${crop.exp} XP`, `💰 售 ${crop.sellPrice}`]}
+                  unitPrice={crop.seedPrice}
+                  defaultQty={Math.max(1, emptyPlots)}
+                  stock={stockOf(crop._id)}
+                  maxAfford={maxAfford}
+                  disabled={locked || maxAfford < 1}
+                  lockText={locked ? t('shop.locked', {n: crop.minLevel}) : maxAfford < 1 ? '💰' : undefined}
+                  buyText={t('shop.buy')}
+                  stockText={(n) => t('shop.stock', {n})}
+                  onBuy={(qty) => onBuyCrop(crop, qty)}
+                />
               )
             })}
           </div>
         ) : (
           <div className="shop-grid">
             {fertilizers.map((fert) => {
-              const poor = player.coins < fert.price
+              const maxAfford = Math.floor(player.coins / fert.price)
               return (
-                <button
+                <BuyCard
                   key={fert._id}
-                  className={`seed-card ${poor ? 'disabled' : ''}`}
-                  disabled={poor}
-                  onClick={() => onBuyFert(fert)}
-                >
-                  <div className="seed-card-top">
-                    <span className="seed-card-emoji">{fert.emoji ?? '🧪'}</span>
-                    <div className="seed-card-name">
-                      <b>{lname(fert, lang)}</b>
-                      <i>{fert.description ?? ''}</i>
-                    </div>
-                  </div>
-                  <div className="seed-card-stats">
-                    <span>⏩ +{Math.round(fert.speedBoost * 100)}%</span>
-                    {fert.yieldBoost > 0 && <span>💰 +{Math.round(fert.yieldBoost * 100)}%</span>}
-                  </div>
-                  <div className="seed-card-foot">
-                    <span className="price">
-                      <span className="coin-mini">🪙</span>
-                      {fert.price}
-                    </span>
-                    <span className="profit">{t('shop.bought')}</span>
-                  </div>
-                  {poor && <span className="lock-ribbon poor">💰</span>}
-                </button>
+                  emoji={fert.emoji ?? '🧪'}
+                  name={lname(fert, lang)}
+                  desc={fert.description ?? ''}
+                  stats={[
+                    `⏩ +${Math.round(fert.speedBoost * 100)}%`,
+                    ...(fert.yieldBoost > 0 ? [`💰 +${Math.round(fert.yieldBoost * 100)}%`] : []),
+                  ]}
+                  unitPrice={fert.price}
+                  defaultQty={1}
+                  stock={stockOf(fert._id)}
+                  maxAfford={maxAfford}
+                  disabled={maxAfford < 1}
+                  lockText={maxAfford < 1 ? '💰' : undefined}
+                  buyText={t('shop.buy')}
+                  stockText={(n) => t('shop.stock', {n})}
+                  onBuy={(qty) => onBuyFert(fert, qty)}
+                />
               )
             })}
           </div>

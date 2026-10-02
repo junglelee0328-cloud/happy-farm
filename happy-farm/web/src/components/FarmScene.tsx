@@ -28,6 +28,10 @@ import {
 
 const HORIZON = 150
 
+/** 播种/施肥模式下鼠标变成道具图标 */
+const emojiCursor = (emoji: string) =>
+  `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36"><text y="27" font-size="27">${emoji}</text></svg>`)}") 18 18, pointer`
+
 export interface PlotWithCrop extends Plot {
   crop?: Crop
 }
@@ -189,6 +193,17 @@ export default function FarmScene({
   const wrapRef = useRef<HTMLDivElement>(null)
   const [aspect, setAspect] = useState(BASE_VIEW.w / BASE_VIEW.h)
   const [hovered, setHovered] = useState<number | null>(null)
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  /** 悬停提示卡：离开地块后延迟关闭，移到卡片上时保持打开 */
+  const enterPlot = (index: number) => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current)
+    setHovered(index)
+  }
+  const leavePlot = (index: number) => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current)
+    hoverTimer.current = setTimeout(() => setHovered((h) => (h === index ? null : h)), 400)
+  }
 
   useEffect(() => {
     const el = wrapRef.current
@@ -414,9 +429,18 @@ export default function FarmScene({
               <polygon
                 points={hot}
                 fill="transparent"
-                style={{cursor: busy || locked ? 'default' : 'pointer'}}
-                onMouseEnter={() => setHovered(plot.index)}
-                onMouseLeave={() => setHovered((h) => (h === plot.index ? null : h))}
+                style={{
+                  cursor:
+                    busy || locked
+                      ? 'default'
+                      : fertSelected
+                        ? emojiCursor('🧪')
+                        : seedName
+                          ? emojiCursor('🌱')
+                          : 'pointer',
+                }}
+                onMouseEnter={() => enterPlot(plot.index)}
+                onMouseLeave={() => leavePlot(plot.index)}
                 onClick={() => !locked && clickPlot(plot, growth)}
               />
               {isHover && !locked && (
@@ -434,7 +458,12 @@ export default function FarmScene({
 
       {/* 悬浮信息卡 */}
       {hoveredItem && hoveredAnchor && (
-        <div className="plot-tip" style={pct(hoveredAnchor.x, hoveredAnchor.y - TILE_H - 6)}>
+        <div
+          className="plot-tip"
+          style={pct(hoveredAnchor.x, hoveredAnchor.y - TILE_H - 6)}
+          onMouseEnter={() => enterPlot(hoveredItem.plot.index)}
+          onMouseLeave={() => leavePlot(hoveredItem.plot.index)}
+        >
           <PlotTip
             item={hoveredItem}
             player={player}

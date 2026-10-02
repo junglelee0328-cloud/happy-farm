@@ -11,7 +11,7 @@ interface Props {
 
 export default function BackpackModal({player, onClose, onUse}: Props) {
   const {t, lang} = useT()
-  const items = (player.inventory ?? []).filter((i) => i.item && i.count > 0)
+  const items = (player.inventory ?? []).filter((i) => i.item && i.item._type === 'fertilizer' && i.count > 0)
 
   return (
     <div className="modal-mask" onClick={onClose}>
@@ -24,7 +24,7 @@ export default function BackpackModal({player, onClose, onUse}: Props) {
         <div className="friend-list">
           {items.length === 0 && <p className="friend-empty">{t('bag.empty')}</p>}
           {items.map((entry) => {
-            const fert = entry.item!
+            const fert = entry.item as Fertilizer
             return (
               <div key={fert._id} className="friend-item bag-item">
                 <span className="friend-avatar">{fert.emoji ?? '🧪'}</span>

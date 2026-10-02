@@ -3,7 +3,6 @@ import {formatCountdown} from '../lib/growth'
 import {lname, useT} from '../i18n'
 
 interface Props {
-  crops: Crop[]
   player: Player
   selectedSeedId: string
   readyCount: number
@@ -20,7 +19,6 @@ interface Props {
 }
 
 export default function Toolbar({
-  crops,
   player,
   selectedSeedId,
   readyCount,
@@ -66,31 +64,34 @@ export default function Toolbar({
             <i>{selectedSeedId ? t('dock.seedsActive') : t('dock.seedsIdle')}</i>
           </div>
           <div className="seed-list">
-            {crops.map((crop, i) => {
-              const locked = player.level < crop.minLevel
-              const poor = player.coins < crop.seedPrice
-              const active = selectedSeedId === crop._id
-              return (
-                <button
-                  key={crop._id}
-                  className={`seed-chip ${active ? 'active' : ''} ${locked ? 'locked' : ''}`}
-                  disabled={locked}
-                  onClick={() => onSelectSeed(active ? '' : crop._id)}
-                  title={
-                    locked
-                      ? t('shop.locked', {n: crop.minLevel})
-                      : `${lname(crop, lang)} · ${crop.seedPrice}💰 · ${formatCountdown(crop.growTime)} · ${crop.exp}XP`
-                  }
-                >
-                  <span className="seed-emoji">{crop.emoji ?? '🌱'}</span>
-                  <span className="seed-name">{lname(crop, lang)}</span>
-                  <span className={`seed-price ${poor && !locked ? 'poor' : ''}`}>
-                    {locked ? `🔒${crop.minLevel}` : `${crop.seedPrice}`}
-                  </span>
-                  {i < 9 && <span className="seed-key">{i + 1}</span>}
-                </button>
-              )
-            })}
+            {(() => {
+              const seedItems = (player.inventory ?? []).filter((e) => e.item && e.item._type === 'crop' && e.count > 0)
+              if (seedItems.length === 0) {
+                return (
+                  <button className="seed-chip empty-hint" onClick={onOpenShop}>
+                    <span className="seed-emoji">🌱</span>
+                    <span className="seed-name">{t('dock.noSeeds')}</span>
+                  </button>
+                )
+              }
+              return seedItems.map((entry, i) => {
+                const crop = entry.item as Crop
+                const active = selectedSeedId === crop._id
+                return (
+                  <button
+                    key={entry._key ?? crop._id}
+                    className={`seed-chip ${active ? 'active' : ''}`}
+                    onClick={() => onSelectSeed(active ? '' : crop._id)}
+                    title={`${lname(crop, lang)} · ${formatCountdown(crop.growTime)} · ${crop.exp}XP`}
+                  >
+                    <span className="seed-emoji">{crop.emoji ?? '🌱'}</span>
+                    <span className="seed-name">{lname(crop, lang)}</span>
+                    <span className="seed-price">×{entry.count}</span>
+                    {i < 9 && <span className="seed-key">{i + 1}</span>}
+                  </button>
+                )
+              })
+            })()}
           </div>
         </div>
 

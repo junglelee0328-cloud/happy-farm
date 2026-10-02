@@ -1,5 +1,6 @@
 export interface Crop {
   _id: string
+  _type?: string
   name: string
   nameEn?: string
   emoji?: string
@@ -22,13 +23,14 @@ export interface Player {
   coins: number
   stolenToday?: number
   authId?: string
-  inventory?: {_key?: string; item?: Fertilizer; count: number}[]
+  inventory?: {_key?: string; item?: Crop | Fertilizer; count: number}[]
 }
 
 export type LandTier = 'normal' | 'red' | 'black'
 
 export interface Fertilizer {
   _id: string
+  _type?: string
   name: string
   nameEn?: string
   emoji?: string
