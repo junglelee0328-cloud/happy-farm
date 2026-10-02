@@ -2,7 +2,7 @@ import {memo, useEffect, useMemo, useRef, useState} from 'react'
 import type {ReactNode} from 'react'
 import type {GrowthState} from '../lib/growth'
 import {formatCountdown, effectiveTier, TIER_INFO, tierSpeedBoost, tierYieldBoost} from '../lib/growth'
-import type {Crop, GameRule, Player, Plot} from '../types'
+import type {Crop, Fertilizer, GameRule, Player, Plot} from '../types'
 import {BASE_VIEW, TILE_H, TILE_W, coverView, plotAnchor, round} from '../lib/iso'
 import CropArt, {WM_CLIP_ID, WitheredArt} from '../art/CropArt'
 import type {Stage} from '../art/CropArt'
@@ -58,6 +58,7 @@ interface Props {
   /** 好友模式下：今天剩余的偷菜次数 */
   stolenLeft?: number
   stealRatio?: number
+  fertilizers?: Fertilizer[]
   onPlant: (plot: PlotWithCrop) => void
   onOpenShop: (plot: PlotWithCrop) => void
   onWater: (plot: PlotWithCrop) => void
@@ -66,6 +67,7 @@ interface Props {
   onHarvest: (plot: PlotWithCrop) => void
   onClearWithered: (plot: PlotWithCrop) => void
   onSteal?: (plot: PlotWithCrop) => void
+  onFertilize?: (plot: PlotWithCrop, fert: Fertilizer) => void
 }
 
 function stageOf(growth: GrowthState): Stage {
@@ -169,6 +171,7 @@ export default function FarmScene({
   visitorName,
   stolenLeft,
   stealRatio,
+  fertilizers = [],
   onPlant,
   onOpenShop,
   onWater,
@@ -177,6 +180,7 @@ export default function FarmScene({
   onHarvest,
   onClearWithered,
   onSteal,
+  onFertilize,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const [aspect, setAspect] = useState(BASE_VIEW.w / BASE_VIEW.h)
@@ -433,6 +437,7 @@ export default function FarmScene({
             visitorName={visitorName}
             stolenLeft={stolenLeft}
             stealRatio={stealRatio}
+            fertilizers={fertilizers}
             onPlant={onPlant}
             onOpenShop={onOpenShop}
             onWater={onWater}
@@ -441,6 +446,7 @@ export default function FarmScene({
             onHarvest={onHarvest}
             onClearWithered={onClearWithered}
             onSteal={onSteal}
+            onFertilize={onFertilize}
           />
         </div>
       )}
@@ -465,6 +471,7 @@ interface TipProps {
   visitorName?: string
   stolenLeft?: number
   stealRatio?: number
+  fertilizers?: Fertilizer[]
   onPlant: (plot: PlotWithCrop) => void
   onOpenShop: (plot: PlotWithCrop) => void
   onWater: (plot: PlotWithCrop) => void
@@ -473,6 +480,7 @@ interface TipProps {
   onHarvest: (plot: PlotWithCrop) => void
   onClearWithered: (plot: PlotWithCrop) => void
   onSteal?: (plot: PlotWithCrop) => void
+  onFertilize?: (plot: PlotWithCrop, fert: Fertilizer) => void
 }
 
 function PlotTip({
@@ -485,6 +493,7 @@ function PlotTip({
   visitorName,
   stolenLeft,
   stealRatio,
+  fertilizers = [],
   onPlant,
   onOpenShop,
   onWater,
@@ -493,6 +502,7 @@ function PlotTip({
   onHarvest,
   onClearWithered,
   onSteal,
+  onFertilize,
 }: TipProps) {
   const {plot, growth} = item
   const locked = player.level < (plot.unlockLevel ?? 1)
@@ -566,6 +576,21 @@ function PlotTip({
           💧 浇水
         </button>,
       )
+    if (!plot.fertilizer && fertilizers.length > 0) {
+      for (const fert of fertilizers) {
+        actions.push(
+          <button
+            key={fert._id}
+            className="tip-btn"
+            disabled={busy}
+            onClick={() => onFertilize?.(plot, fert)}
+            title={fert.description}
+          >
+            {fert.emoji ?? '🧪'} {fert.name} {fert.price}💰
+          </button>,
+        )
+      }
+    }
     if (plot.hasWeed)
       actions.push(
         <button key="g" className="tip-btn warn" disabled={busy} onClick={() => onClearWeed(plot)}>
@@ -640,6 +665,14 @@ function PlotTip({
         </div>
       )}
       {plot.isWatered && growth.status === 'growing' && <div className="tip-badges"><span className="badge good">💧 已浇水 · 加速生长</span></div>}
+      {plot.fertilizer && growth.status === 'growing' && (
+        <div className="tip-badges">
+          <span className="badge good">
+            {plot.fertilizer.emoji ?? '🧪'} {plot.fertilizer.name}生效中 · 提速{Math.round(plot.fertilizer.speedBoost * 100)}%
+            {plot.fertilizer.yieldBoost ? ` · 增产${Math.round(plot.fertilizer.yieldBoost * 100)}%` : ''}
+          </span>
+        </div>
+      )}
       {actions.length > 0 && <div className="tip-actions">{actions}</div>}
     </div>
   )

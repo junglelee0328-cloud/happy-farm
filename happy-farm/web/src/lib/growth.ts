@@ -51,7 +51,8 @@ export function computeGrowth(plot: Plot, rule: GameRule | null, now = Date.now(
 
   const growTime = plot.crop.growTime
   const boost = plot.isWatered ? (rule?.waterSpeedBoost ?? 0) : 0
-  const effectiveGrowTime = growTime / ((1 + boost) * (1 + tierSpeedBoost(tier, rule)))
+  const fertBoost = plot.fertilizer?.speedBoost ?? 0
+  const effectiveGrowTime = growTime / ((1 + boost) * (1 + tierSpeedBoost(tier, rule)) * (1 + fertBoost))
 
   let rate = 1
   if (plot.hasBug) rate = 0

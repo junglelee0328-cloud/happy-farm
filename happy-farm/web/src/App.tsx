@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {client} from './lib/sanity'
 import {computeGrowth, effectiveTier, levelForXp, tierYieldBoost} from './lib/growth'
-import type {Crop, GameRule, Player, Plot} from './types'
+import type {Crop, Fertilizer, GameRule, Player, Plot} from './types'
 import {plotAnchor} from './lib/iso'
 import FarmScene from './components/FarmScene'
 import type {Floater, PlotWithCrop} from './components/FarmScene'
@@ -15,6 +15,7 @@ let floaterId = 0
 
 export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
   const [crops, setCrops] = useState<Crop[]>([])
+  const [fertilizers, setFertilizers] = useState<Fertilizer[]>([])
   const [players, setPlayers] = useState<Player[]>([])
   const [playerId, setPlayerId] = useState<string>('')
   const [plots, setPlots] = useState<PlotWithCrop[]>([])
@@ -54,15 +55,17 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
   }, [])
 
   const refresh = useCallback(async (pid: string) => {
-    const [cropList, playerList, ruleDoc, plotList] = await Promise.all([
+    const [cropList, fertList, playerList, ruleDoc, plotList] = await Promise.all([
       client.fetch<Crop[]>('*[_type == "crop"] | order(minLevel asc)'),
+      client.fetch<Fertilizer[]>('*[_type == "fertilizer"] | order(price asc)'),
       client.fetch<Player[]>('*[_type == "player"]'),
       client.fetch<GameRule | null>('*[_type == "gameRule"][0]'),
       pid
-        ? client.fetch<PlotWithCrop[]>('*[_type == "plot" && owner._ref == $pid] | order(index asc) {..., crop->}', {pid})
+        ? client.fetch<PlotWithCrop[]>('*[_type == "plot" && owner._ref == $pid] | order(index asc) {..., crop->, fertilizer->}', {pid})
         : Promise.resolve([] as PlotWithCrop[]),
     ])
     setCrops(cropList)
+    setFertilizers(fertList)
     setPlayers(playerList)
     setRule(ruleDoc)
     setPlots(plotList)
@@ -104,7 +107,7 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
     }
     const load = () =>
       client
-        .fetch<PlotWithCrop[]>('*[_type == "plot" && owner._ref == $pid] | order(index asc) {..., crop->}', {pid: friendId})
+        .fetch<PlotWithCrop[]>('*[_type == "plot" && owner._ref == $pid] | order(index asc) {..., crop->, fertilizer->}', {pid: friendId})
         .then(setFriendPlots)
         .catch(() => {})
     load()
@@ -159,7 +162,7 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
               hasWeed: false,
               hasBug: false,
             })
-            .unset(['stolenBy']),
+            .unset(['stolenBy', 'fertilizer']),
         )
         .commit()
       addFloater(plot.index, `-${crop.seedPrice} 💰`, 'xp')
@@ -171,6 +174,19 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
       await client.patch(plot._id).set({isWatered: true}).commit()
       addFloater(plot.index, '💧 加速中', 'xp', -26)
     }, '浇水成功，生长加速 20%！')
+
+  const applyFertilizer = (plot: PlotWithCrop, fert: Fertilizer) =>
+    run(async () => {
+      if (!player) throw new Error('没有选中玩家')
+      if (player.coins < fert.price) throw new Error(`金币不足，${fert.name}需要 ${fert.price}💰`)
+      await client
+        .transaction()
+        .patch(player._id, (p) => p.dec({coins: fert.price}))
+        .patch(plot._id, (p) => p.set({fertilizer: {_type: 'reference', _ref: fert._id}}))
+        .commit()
+      addFloater(plot.index, `${fert.emoji ?? '🧪'} 提速${Math.round(fert.speedBoost * 100)}%`, 'xp', -26)
+      return `施了${fert.name}，本茬提速 ${Math.round(fert.speedBoost * 100)}%${fert.yieldBoost ? `、增产 ${Math.round(fert.yieldBoost * 100)}%` : ''}！`
+    }, '')
 
   const clearWeed = (plot: PlotWithCrop) =>
     run(async () => {
@@ -186,7 +202,9 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
     run(async () => {
       const crop = plot.crop
       if (!player || !crop) throw new Error('这块地没有作物')
-      const yieldCoins = Math.round(crop.sellPrice * (1 + tierYieldBoost(effectiveTier(plot, player.level), rule)))
+      const yieldCoins = Math.round(
+        crop.sellPrice * (1 + tierYieldBoost(effectiveTier(plot, player.level), rule) + (plot.fertilizer?.yieldBoost ?? 0)),
+      )
       const newXp = player.xp + crop.exp
       const {level} = levelForXp(newXp, rule)
       const leveledUp = level > player.level
@@ -194,7 +212,7 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
         .transaction()
         .patch(player._id, (p) => p.inc({coins: yieldCoins, xp: crop.exp}).set({level}))
         .patch(plot._id, (p) =>
-          p.set({status: 'empty', isWatered: false, hasWeed: false, hasBug: false}).unset(['crop', 'plantedAt', 'stolenBy']),
+          p.set({status: 'empty', isWatered: false, hasWeed: false, hasBug: false}).unset(['crop', 'plantedAt', 'stolenBy', 'fertilizer']),
         )
         .commit()
       addFloater(plot.index, `+${yieldCoins} 💰`, 'coin')
@@ -211,7 +229,7 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
       await client
         .patch(plot._id)
         .set({status: 'empty', isWatered: false, hasWeed: false, hasBug: false})
-        .unset(['crop', 'plantedAt', 'stolenBy'])
+        .unset(['crop', 'plantedAt', 'stolenBy', 'fertilizer'])
         .commit()
     }, '🧹 铲除了枯萎的作物')
 
@@ -257,11 +275,13 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
         const crop = plot.crop
         if (!crop) continue
         xpGain += crop.exp
-        const yieldCoins = Math.round(crop.sellPrice * (1 + tierYieldBoost(effectiveTier(plot, player.level), rule)))
+        const yieldCoins = Math.round(
+          crop.sellPrice * (1 + tierYieldBoost(effectiveTier(plot, player.level), rule) + (plot.fertilizer?.yieldBoost ?? 0)),
+        )
         coins += yieldCoins
         addFloater(plot.index, `+${yieldCoins} 💰`, 'coin')
         tx.patch(plot._id, (p) =>
-          p.set({status: 'empty', isWatered: false, hasWeed: false, hasBug: false}).unset(['crop', 'plantedAt', 'stolenBy']),
+          p.set({status: 'empty', isWatered: false, hasWeed: false, hasBug: false}).unset(['crop', 'plantedAt', 'stolenBy', 'fertilizer']),
         )
       }
       const {level} = levelForXp(player.xp + xpGain, rule)
@@ -365,6 +385,7 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
           visitorName={player.nickname}
           stolenLeft={(rule?.stealDailyLimit ?? 5) - (player.stolenToday ?? 0)}
           stealRatio={rule?.stealRatio}
+          fertilizers={fertilizers}
           onPlant={handleTilePlant}
           onOpenShop={openShopForPlot}
           onWater={water}
@@ -373,6 +394,7 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
           onHarvest={harvest}
           onClearWithered={clearWithered}
           onSteal={steal}
+          onFertilize={applyFertilizer}
         />
 
         <div className="stage-hint">

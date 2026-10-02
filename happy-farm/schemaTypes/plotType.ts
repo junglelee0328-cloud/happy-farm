@@ -34,6 +34,7 @@ export default defineType({
       initialValue: 'empty',
     }),
     defineField({name: 'isWatered', title: '已浇水(加速生长)', type: 'boolean', initialValue: false}),
+    defineField({name: 'fertilizer', title: '已施化肥', type: 'reference', to: [{type: 'fertilizer'}], description: '本茬作物生效，收获后清除'}),
     defineField({name: 'hasWeed', title: '长了杂草', type: 'boolean', initialValue: false}),
     defineField({name: 'hasBug', title: '生了害虫', type: 'boolean', initialValue: false}),
     defineField({name: 'stolenBy', title: '被偷记录', type: 'string', description: '谁偷过这块地，逗号分隔昵称'}),

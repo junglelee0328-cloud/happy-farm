@@ -25,6 +25,16 @@ export interface Player {
 
 export type LandTier = 'normal' | 'red' | 'black'
 
+export interface Fertilizer {
+  _id: string
+  name: string
+  emoji?: string
+  price: number
+  speedBoost: number
+  yieldBoost: number
+  description?: string
+}
+
 export interface Plot {
   _id: string
   index: number
@@ -40,6 +50,8 @@ export interface Plot {
   hasWeed: boolean
   hasBug: boolean
   stolenBy?: string
+  /** 本茬作物已施的化肥，收获后清除 */
+  fertilizer?: Fertilizer
 }
 
 export interface GameRule {
