@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
 import {client} from './lib/sanity'
-import {computeGrowth, levelForXp} from './lib/growth'
+import {computeGrowth, levelForXp, tierYieldBoost} from './lib/growth'
 import type {Crop, GameRule, Player, Plot} from './types'
 import {plotAnchor} from './lib/iso'
 import FarmScene from './components/FarmScene'
@@ -183,23 +183,24 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
     run(async () => {
       const crop = plot.crop
       if (!player || !crop) throw new Error('这块地没有作物')
+      const yieldCoins = Math.round(crop.sellPrice * (1 + tierYieldBoost(plot.tier, rule)))
       const newXp = player.xp + crop.exp
       const {level} = levelForXp(newXp, rule)
       const leveledUp = level > player.level
       await client
         .transaction()
-        .patch(player._id, (p) => p.inc({coins: crop.sellPrice, xp: crop.exp}).set({level}))
+        .patch(player._id, (p) => p.inc({coins: yieldCoins, xp: crop.exp}).set({level}))
         .patch(plot._id, (p) =>
           p.set({status: 'empty', isWatered: false, hasWeed: false, hasBug: false}).unset(['crop', 'plantedAt', 'stolenBy']),
         )
         .commit()
-      addFloater(plot.index, `+${crop.sellPrice} 💰`, 'coin')
+      addFloater(plot.index, `+${yieldCoins} 💰`, 'coin')
       addFloater(plot.index, `+${crop.exp} ✨`, 'xp', -30)
       if (leveledUp) {
         setLevelUp(level)
         setTimeout(() => setLevelUp(null), 3200)
       }
-      return leveledUp ? `🎉 收获 ${crop.name}，升级到 Lv.${level}！` : `收获 ${crop.name} +${crop.sellPrice} 金币`
+      return leveledUp ? `🎉 收获 ${crop.name}，升级到 Lv.${level}！` : `收获 ${crop.name} +${yieldCoins} 金币`
     }, '')
 
   const clearWithered = (plot: PlotWithCrop) =>
@@ -253,8 +254,9 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
         const crop = plot.crop
         if (!crop) continue
         xpGain += crop.exp
-        coins += crop.sellPrice
-        addFloater(plot.index, `+${crop.sellPrice} 💰`, 'coin')
+        const yieldCoins = Math.round(crop.sellPrice * (1 + tierYieldBoost(plot.tier, rule)))
+        coins += yieldCoins
+        addFloater(plot.index, `+${yieldCoins} 💰`, 'coin')
         tx.patch(plot._id, (p) =>
           p.set({status: 'empty', isWatered: false, hasWeed: false, hasBug: false}).unset(['crop', 'plantedAt', 'stolenBy']),
         )
@@ -355,6 +357,7 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
           busy={busy}
           seedName={friend ? undefined : seed?.name}
           floaters={floaters}
+          rule={rule}
           mode={friend ? 'friend' : 'mine'}
           visitorName={player.nickname}
           stolenLeft={(rule?.stealDailyLimit ?? 5) - (player.stolenToday ?? 0)}

@@ -23,10 +23,13 @@ export interface Player {
   authId?: string
 }
 
+export type LandTier = 'normal' | 'red' | 'black'
+
 export interface Plot {
   _id: string
   index: number
   unlockLevel?: number
+  tier?: LandTier
   crop?: Crop
   plantedAt?: string
   status: 'empty' | 'growing' | 'ready' | 'withered'
@@ -46,4 +49,8 @@ export interface GameRule {
   stealDailyLimit?: number
   stealRatio?: number
   basePlotCount?: number
+  redYieldBoost?: number
+  redSpeedBoost?: number
+  blackYieldBoost?: number
+  blackSpeedBoost?: number
 }

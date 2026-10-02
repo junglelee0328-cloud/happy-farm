@@ -1,8 +1,8 @@
 import {memo, useEffect, useMemo, useRef, useState} from 'react'
 import type {ReactNode} from 'react'
 import type {GrowthState} from '../lib/growth'
-import {formatCountdown} from '../lib/growth'
-import type {Crop, Player, Plot} from '../types'
+import {formatCountdown, TIER_INFO, tierSpeedBoost, tierYieldBoost} from '../lib/growth'
+import type {Crop, GameRule, Player, Plot} from '../types'
 import {BASE_VIEW, TILE_H, TILE_W, coverView, plotAnchor, round} from '../lib/iso'
 import CropArt, {WM_CLIP_ID, WitheredArt} from '../art/CropArt'
 import type {Stage} from '../art/CropArt'
@@ -50,6 +50,7 @@ interface Props {
   busy: boolean
   seedName?: string
   floaters: Floater[]
+  rule?: GameRule | null
   /** 'mine' = 自己的农场，'friend' = 好友农场（只能偷菜/帮忙） */
   mode?: 'mine' | 'friend'
   /** 好友模式下：当前访客（我）的昵称，用于判断这块地有没有被我偷过 */
@@ -92,6 +93,7 @@ interface PieceProps {
   index: number
   locked: boolean
   unlockLevel: number
+  tier: 'normal' | 'red' | 'black'
   cropId: string
   cropName: string
   emoji?: string
@@ -112,6 +114,7 @@ const PlotPiece = memo(function PlotPiece({
   index,
   locked,
   unlockLevel,
+  tier,
   cropId,
   cropName,
   emoji,
@@ -125,9 +128,9 @@ const PlotPiece = memo(function PlotPiece({
   return (
     <g transform={`translate(${round(x)} ${round(y)})`}>
       {locked ? (
-        <LockedTile level={unlockLevel} />
+        <LockedTile level={unlockLevel} tier={tier} />
       ) : (
-        <SoilTile x={0} y={0} seed={index} state={status} watered={watered} />
+        <SoilTile x={0} y={0} seed={index} state={status} watered={watered} tier={tier} />
       )}
       {!locked && status !== 'empty' && (
         <>
@@ -161,6 +164,7 @@ export default function FarmScene({
   busy,
   seedName,
   floaters,
+  rule = null,
   mode = 'mine',
   visitorName,
   stolenLeft,
@@ -371,6 +375,7 @@ export default function FarmScene({
                 index={plot.index}
                 locked={player.level < (plot.unlockLevel ?? 1)}
                 unlockLevel={plot.unlockLevel ?? 1}
+                tier={plot.tier ?? 'normal'}
                 cropId={plot.crop?._id ?? ''}
                 cropName={plot.crop?.name ?? ''}
                 emoji={plot.crop?.emoji}
@@ -423,6 +428,7 @@ export default function FarmScene({
             player={player}
             busy={busy}
             seedName={seedName}
+            rule={rule}
             mode={mode}
             visitorName={visitorName}
             stolenLeft={stolenLeft}
@@ -454,6 +460,7 @@ interface TipProps {
   player: Player
   busy: boolean
   seedName?: string
+  rule?: GameRule | null
   mode: 'mine' | 'friend'
   visitorName?: string
   stolenLeft?: number
@@ -473,6 +480,7 @@ function PlotTip({
   player,
   busy,
   seedName,
+  rule,
   mode,
   visitorName,
   stolenLeft,
@@ -601,6 +609,12 @@ function PlotTip({
         {plot.crop && <span className="tip-crop">{plot.crop.name}</span>}
       </div>
       <div className="tip-sub">{statusText}</div>
+      {(plot.tier ?? 'normal') !== 'normal' && (
+        <div className="tip-sub">
+          {TIER_INFO[plot.tier ?? 'normal'].emoji} {TIER_INFO[plot.tier ?? 'normal'].label}
+          {' '}· 产量+{Math.round(tierYieldBoost(plot.tier, rule ?? null) * 100)}% · 生长+{Math.round(tierSpeedBoost(plot.tier, rule ?? null) * 100)}%
+        </div>
+      )}
       {growth.status === 'growing' && (
         <div className="tip-progress">
           <div className="tip-progress-fill" style={{width: `${growth.progress * 100}%`}} />

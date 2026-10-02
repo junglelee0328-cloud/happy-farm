@@ -28,6 +28,10 @@ export default defineType({
     defineField({name: 'stealDailyLimit', title: '每日偷菜次数上限', type: 'number'}),
     defineField({name: 'stealRatio', title: '单次偷取比例', type: 'number', description: '如 0.2 = 每次偷走产量的 20%'}),
     defineField({name: 'basePlotCount', title: '初始土地数量', type: 'number'}),
+    defineField({name: 'redYieldBoost', title: '红土地产量加成', type: 'number', description: '如 0.2 = 红土地收获金币 +20%'}),
+    defineField({name: 'redSpeedBoost', title: '红土地生长加速', type: 'number', description: '如 0.2 = 红土地生长速度 +20%'}),
+    defineField({name: 'blackYieldBoost', title: '黑土地产量加成', type: 'number', description: '如 0.5 = 黑土地收获金币 +50%'}),
+    defineField({name: 'blackSpeedBoost', title: '黑土地生长加速', type: 'number', description: '如 0.4 = 黑土地生长速度 +40%'}),
   ],
   preview: {prepare: () => ({title: '📜 游戏规则', subtitle: '改这里，游戏行为立刻变化'})},
 })

@@ -6,6 +6,20 @@ export default defineType({
   type: 'document',
   fields: [
     defineField({name: 'index', title: '土地编号', type: 'number', validation: (r) => r.required()}),
+    defineField({
+      name: 'tier',
+      title: '土地等级',
+      type: 'string',
+      options: {
+        list: [
+          {title: '🟫 普通土地', value: 'normal'},
+          {title: '🟥 红土地', value: 'red'},
+          {title: '⬛ 黑土地', value: 'black'},
+        ],
+        layout: 'radio',
+      },
+      initialValue: 'normal',
+    }),
     defineField({name: 'unlockLevel', title: '解锁等级', type: 'number', initialValue: 1, description: '玩家达到该等级才能使用这块地'}),
     defineField({
       name: 'owner',

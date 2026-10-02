@@ -1,4 +1,4 @@
-import type {GameRule, Plot} from '../types'
+import type {GameRule, LandTier, Plot} from '../types'
 
 export interface GrowthState {
   status: Plot['status']
@@ -11,9 +11,29 @@ export interface GrowthState {
 
 const DEFAULT_EMOJI = ['🌱', '🌿', '🍃', '🌾']
 
+/** 土地等级配置：标签 + 加成字段名 */
+export const TIER_INFO: Record<LandTier, {label: string; emoji: string}> = {
+  normal: {label: '普通土地', emoji: '🟫'},
+  red: {label: '红土地', emoji: '🟥'},
+  black: {label: '黑土地', emoji: '⬛'},
+}
+
+export function tierSpeedBoost(tier: LandTier | undefined, rule: GameRule | null): number {
+  if (tier === 'red') return rule?.redSpeedBoost ?? 0
+  if (tier === 'black') return rule?.blackSpeedBoost ?? 0
+  return 0
+}
+
+export function tierYieldBoost(tier: LandTier | undefined, rule: GameRule | null): number {
+  if (tier === 'red') return rule?.redYieldBoost ?? 0
+  if (tier === 'black') return rule?.blackYieldBoost ?? 0
+  return 0
+}
+
 /**
  * QQ 农场生长引擎（数据驱动，规则全部来自 Sanity 的 gameRule 文档）：
  * - 浇水：生长速度提升 waterSpeedBoost（如 0.2 → 提速 20%）
+ * - 土地等级：红土/黑土按 rule 里的加成提速，收获也增产
  * - 杂草：生长速度减半，需要手动除草
  * - 害虫：生长完全暂停，需要手动除虫
  * - 成熟后超过 witherAfter 秒不收获 → 枯萎
@@ -24,7 +44,7 @@ export function computeGrowth(plot: Plot, rule: GameRule | null, now = Date.now(
 
   const growTime = plot.crop.growTime
   const boost = plot.isWatered ? (rule?.waterSpeedBoost ?? 0) : 0
-  const effectiveGrowTime = growTime / (1 + boost)
+  const effectiveGrowTime = growTime / ((1 + boost) * (1 + tierSpeedBoost(plot.tier, rule)))
 
   let rate = 1
   if (plot.hasBug) rate = 0

@@ -182,16 +182,24 @@ export function SoilTile({
   seed,
   state,
   watered,
+  tier = 'normal',
 }: {
   x: number
   y: number
   seed: number
   state: 'empty' | 'growing' | 'ready' | 'withered'
   watered?: boolean
+  tier?: 'normal' | 'red' | 'black'
 }) {
   const dry = state === 'withered'
-  const top = watered ? '#7a5530' : dry ? '#8b7a63' : '#96653a'
-  const rimLight = watered ? '#8f6a41' : dry ? '#a49a86' : '#b1804e'
+  const palettes = {
+    normal: {top: '#96653a', rim: '#b1804e'},
+    red: {top: '#a04a30', rim: '#c4714e'},
+    black: {top: '#453a30', rim: '#6e5f4e'},
+  } as const
+  const pal = palettes[tier]
+  const top = watered ? '#7a5530' : dry ? '#8b7a63' : pal.top
+  const rimLight = watered ? '#8f6a41' : dry ? '#a49a86' : pal.rim
   return (
     <g>
       <SoilSides x={x} y={y} />
@@ -237,7 +245,8 @@ export function SoilTile({
 }
 
 /** 未解锁的土地：长满草的土包 + 木牌 */
-export function LockedTile({level}: {level: number}) {
+export function LockedTile({level, tier = 'normal'}: {level: number; tier?: 'normal' | 'red' | 'black'}) {
+  const tierMark = tier === 'red' ? '红土 ' : tier === 'black' ? '黑土 ' : ''
   return (
     <g>
       <polygon
@@ -277,7 +286,7 @@ export function LockedTile({level}: {level: number}) {
           fill="#5b3a17"
           style={{fontFamily: 'inherit'}}
         >
-          🔒 Lv.{level}
+          🔒 {tierMark}Lv.{level}
         </text>
       </g>
     </g>
