@@ -1,8 +1,9 @@
 import {memo, useEffect, useMemo, useRef, useState} from 'react'
 import type {ReactNode} from 'react'
 import type {GrowthState} from '../lib/growth'
-import {formatCountdown, effectiveTier, TIER_INFO, tierSpeedBoost, tierYieldBoost} from '../lib/growth'
-import type {Crop, Fertilizer, GameRule, Player, Plot} from '../types'
+import {formatCountdown, effectiveTier, tierSpeedBoost, tierYieldBoost} from '../lib/growth'
+import type {Crop, GameRule, Player, Plot} from '../types'
+import {useT, lname, TIER_LABEL} from '../i18n'
 import {BASE_VIEW, TILE_H, TILE_W, coverView, plotAnchor, round} from '../lib/iso'
 import CropArt, {WM_CLIP_ID, WitheredArt} from '../art/CropArt'
 import type {Stage} from '../art/CropArt'
@@ -58,7 +59,8 @@ interface Props {
   /** 好友模式下：今天剩余的偷菜次数 */
   stolenLeft?: number
   stealRatio?: number
-  fertilizers?: Fertilizer[]
+  /** 已从背包选中化肥，点生长中的地即可施肥 */
+  fertSelected?: boolean
   onPlant: (plot: PlotWithCrop) => void
   onOpenShop: (plot: PlotWithCrop) => void
   onWater: (plot: PlotWithCrop) => void
@@ -67,7 +69,8 @@ interface Props {
   onHarvest: (plot: PlotWithCrop) => void
   onClearWithered: (plot: PlotWithCrop) => void
   onSteal?: (plot: PlotWithCrop) => void
-  onFertilize?: (plot: PlotWithCrop, fert: Fertilizer) => void
+  onFertilize?: (plot: PlotWithCrop) => void
+  onOpenBag?: () => void
 }
 
 function stageOf(growth: GrowthState): Stage {
@@ -171,7 +174,7 @@ export default function FarmScene({
   visitorName,
   stolenLeft,
   stealRatio,
-  fertilizers = [],
+  fertSelected = false,
   onPlant,
   onOpenShop,
   onWater,
@@ -181,6 +184,7 @@ export default function FarmScene({
   onClearWithered,
   onSteal,
   onFertilize,
+  onOpenBag,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const [aspect, setAspect] = useState(BASE_VIEW.w / BASE_VIEW.h)
@@ -287,6 +291,10 @@ export default function FarmScene({
     if (busy) return
     if (mode === 'friend') {
       if (growth.status === 'ready') onSteal?.(plot)
+      return
+    }
+    if (growth.status === 'growing' && fertSelected) {
+      onFertilize?.(plot)
       return
     }
     if (growth.status === 'empty') {
@@ -437,7 +445,6 @@ export default function FarmScene({
             visitorName={visitorName}
             stolenLeft={stolenLeft}
             stealRatio={stealRatio}
-            fertilizers={fertilizers}
             onPlant={onPlant}
             onOpenShop={onOpenShop}
             onWater={onWater}
@@ -446,7 +453,7 @@ export default function FarmScene({
             onHarvest={onHarvest}
             onClearWithered={onClearWithered}
             onSteal={onSteal}
-            onFertilize={onFertilize}
+            onOpenBag={onOpenBag}
           />
         </div>
       )}
@@ -471,7 +478,7 @@ interface TipProps {
   visitorName?: string
   stolenLeft?: number
   stealRatio?: number
-  fertilizers?: Fertilizer[]
+  onOpenBag?: () => void
   onPlant: (plot: PlotWithCrop) => void
   onOpenShop: (plot: PlotWithCrop) => void
   onWater: (plot: PlotWithCrop) => void
@@ -480,7 +487,7 @@ interface TipProps {
   onHarvest: (plot: PlotWithCrop) => void
   onClearWithered: (plot: PlotWithCrop) => void
   onSteal?: (plot: PlotWithCrop) => void
-  onFertilize?: (plot: PlotWithCrop, fert: Fertilizer) => void
+  onFertilize?: (plot: PlotWithCrop) => void
 }
 
 function PlotTip({
@@ -493,7 +500,6 @@ function PlotTip({
   visitorName,
   stolenLeft,
   stealRatio,
-  fertilizers = [],
   onPlant,
   onOpenShop,
   onWater,
@@ -502,17 +508,16 @@ function PlotTip({
   onHarvest,
   onClearWithered,
   onSteal,
-  onFertilize,
+  onOpenBag,
 }: TipProps) {
+  const {t, lang} = useT()
   const {plot, growth} = item
   const locked = player.level < (plot.unlockLevel ?? 1)
   if (locked) {
     return (
       <div className="tip-card">
-        <div className="tip-title">
-          🔒 第 {plot.index} 号地
-        </div>
-        <div className="tip-sub">达到 Lv.{plot.unlockLevel ?? 1} 解锁</div>
+        <div className="tip-title">🔒 {t('tip.plotNo', {n: plot.index})}</div>
+        <div className="tip-sub">{t('tip.locked', {n: plot.unlockLevel ?? 1})}</div>
       </div>
     )
   }
@@ -526,37 +531,37 @@ function PlotTip({
       const disabled = busy || alreadyStolen || (stolenLeft ?? 0) <= 0
       actions.push(
         <button key="s" className="tip-btn warn" disabled={disabled} onClick={() => onSteal?.(plot)}>
-          🥷 {alreadyStolen ? '这块已经偷过啦' : (stolenLeft ?? 0) <= 0 ? '今日次数用完' : `偷走它 +${stealAmount}💰`}
+          🥷 {alreadyStolen ? t('act.stealDone') : (stolenLeft ?? 0) <= 0 ? t('act.stealLimit') : t('act.steal', {n: stealAmount})}
         </button>,
       )
     }
     if (growth.status === 'growing') {
       if (!plot.isWatered)
-        actions.push(<button key="w" className="tip-btn" disabled={busy} onClick={() => onWater(plot)}>💧 帮忙浇水</button>)
+        actions.push(<button key="w" className="tip-btn" disabled={busy} onClick={() => onWater(plot)}>{t('act.helpWater')}</button>)
       if (plot.hasWeed)
-        actions.push(<button key="g" className="tip-btn" disabled={busy} onClick={() => onClearWeed(plot)}>🌾 帮忙除草</button>)
+        actions.push(<button key="g" className="tip-btn" disabled={busy} onClick={() => onClearWeed(plot)}>{t('act.helpWeed')}</button>)
       if (plot.hasBug)
-        actions.push(<button key="b" className="tip-btn" disabled={busy} onClick={() => onClearBug(plot)}>🐛 帮忙除虫</button>)
+        actions.push(<button key="b" className="tip-btn" disabled={busy} onClick={() => onClearBug(plot)}>{t('act.helpBug')}</button>)
     }
     const friendText =
       growth.status === 'empty'
-        ? '好友还没种东西'
+        ? t('friend.emptyPlot')
         : growth.status === 'growing'
-          ? `还没熟，还剩 ${formatCountdown(growth.secondsLeft)}`
+          ? t('friend.notRipe', {time: formatCountdown(growth.secondsLeft)})
           : growth.status === 'ready'
             ? alreadyStolen
-              ? '被你偷过一茬了'
-              : `熟了！可偷 ${stealAmount}💰`
-            : '枯萎了，真可惜'
+              ? t('act.stealDone')
+              : t('friend.canSteal', {n: stealAmount})
+            : t('friend.withered')
     return (
       <div className="tip-card">
         <div className="tip-title">
           <span className="tip-emoji">{plot.crop?.emoji ?? '🟫'}</span>
-          第 {plot.index} 号地
-          {plot.crop && <span className="tip-crop">{plot.crop.name}</span>}
+          {t('tip.plotNo', {n: plot.index})}
+          {plot.crop && <span className="tip-crop">{lname(plot.crop, lang)}</span>}
         </div>
         <div className="tip-sub">{friendText}</div>
-        {plot.stolenBy && <div className="tip-sub">🥷 被偷过：{plot.stolenBy}</div>}
+        {plot.stolenBy && <div className="tip-sub">{t('friend.stolenBy', {names: plot.stolenBy})}</div>}
         {actions.length > 0 && <div className="tip-actions">{actions}</div>}
       </div>
     )
@@ -565,7 +570,7 @@ function PlotTip({
   if (growth.status === 'empty') {
     actions.push(
       <button key="plant" className="tip-btn primary" disabled={busy} onClick={() => (seedName ? onPlant(plot) : onOpenShop(plot))}>
-        {seedName ? `🌱 种下${seedName}` : '🛒 选种子'}
+        {seedName ? t('act.plantSeed', {name: seedName}) : t('act.pickSeed')}
       </button>,
     )
   }
@@ -573,82 +578,73 @@ function PlotTip({
     if (!plot.isWatered)
       actions.push(
         <button key="w" className="tip-btn" disabled={busy} onClick={() => onWater(plot)}>
-          💧 浇水
+          {t('act.water')}
         </button>,
       )
-    if (!plot.fertilizer && fertilizers.length > 0) {
-      for (const fert of fertilizers) {
-        actions.push(
-          <button
-            key={fert._id}
-            className="tip-btn"
-            disabled={busy}
-            onClick={() => onFertilize?.(plot, fert)}
-            title={fert.description}
-          >
-            {fert.emoji ?? '🧪'} {fert.name} {fert.price}💰
-          </button>,
-        )
-      }
-    }
+    if (!plot.fertilizer)
+      actions.push(
+        <button key="f" className="tip-btn" disabled={busy} onClick={() => onOpenBag?.()}>
+          {t('act.fert')}
+        </button>,
+      )
     if (plot.hasWeed)
       actions.push(
         <button key="g" className="tip-btn warn" disabled={busy} onClick={() => onClearWeed(plot)}>
-          🌾 除草
+          {t('act.weed')}
         </button>,
       )
     if (plot.hasBug)
       actions.push(
         <button key="b" className="tip-btn warn" disabled={busy} onClick={() => onClearBug(plot)}>
-          🐛 除虫
+          {t('act.bug')}
         </button>,
       )
   }
   if (growth.status === 'ready')
     actions.push(
       <button key="h" className="tip-btn primary" disabled={busy} onClick={() => onHarvest(plot)}>
-        🧺 收获 +{plot.crop?.sellPrice ?? 0}💰
+        {t('act.harvest', {n: plot.crop?.sellPrice ?? 0})}
       </button>,
     )
   if (growth.status === 'withered')
     actions.push(
       <button key="c" className="tip-btn" disabled={busy} onClick={() => onClearWithered(plot)}>
-        🧹 铲除
+        {t('act.clear')}
       </button>,
     )
 
   const statusText =
     growth.status === 'empty'
-      ? '空地 · 等待播种'
+      ? t('tip.empty')
       : growth.status === 'growing'
-        ? `还剩 ${formatCountdown(growth.secondsLeft)}`
+        ? t('tip.growing', {time: formatCountdown(growth.secondsLeft)})
         : growth.status === 'ready'
-          ? `可以收获啦（${formatCountdown(growth.readySinceSeconds)} 后枯萎）`
-          : '枯萎了'
+          ? t('tip.ready', {time: formatCountdown(growth.readySinceSeconds)})
+          : t('tip.withered')
 
   return (
     <div className="tip-card">
       <div className="tip-title">
         <span className="tip-emoji">{plot.crop?.emoji ?? '🟫'}</span>
-        第 {plot.index} 号地
-        {plot.crop && <span className="tip-crop">{plot.crop.name}</span>}
+        {t('tip.plotNo', {n: plot.index})}
+        {plot.crop && <span className="tip-crop">{lname(plot.crop, lang)}</span>}
       </div>
       <div className="tip-sub">{statusText}</div>
       {(() => {
-        const t = effectiveTier(plot, player.level)
-        const yPct = Math.round(tierYieldBoost(t, rule ?? null) * 100)
-        const sPct = Math.round(tierSpeedBoost(t, rule ?? null) * 100)
-        const nextLevel = t === 'normal' ? plot.redLevel : t === 'red' ? plot.blackLevel : undefined
-        const nextLabel = t === 'normal' ? '🟥 红土地' : '⬛ 黑土地'
+        const tier = effectiveTier(plot, player.level)
+        const yPct = Math.round(tierYieldBoost(tier, rule ?? null) * 100)
+        const sPct = Math.round(tierSpeedBoost(tier, rule ?? null) * 100)
+        const nextLevel = tier === 'normal' ? plot.redLevel : tier === 'red' ? plot.blackLevel : undefined
+        const nextLabel = tier === 'normal' ? TIER_LABEL.red[lang] : TIER_LABEL.black[lang]
         return (
           <>
-            {t !== 'normal' && (
+            {tier !== 'normal' && (
               <div className="tip-sub">
-                {TIER_INFO[t].emoji} {TIER_INFO[t].label} · 产量+{yPct}% · 生长+{sPct}%
+                {TIER_LABEL[tier][lang]} · {t('tip.tierStat', {y: yPct, s: sPct})}
               </div>
             )}
             {nextLevel != null && (
-              <div className="tip-sub">⏫ Lv.{nextLevel} 起这块地升级为{nextLabel}</div>
+              <div className="tip-sub">{t('tip.tierNext', {n: nextLevel, tier: nextLabel})}</div>
             )}
           </>
         )
@@ -660,16 +656,16 @@ function PlotTip({
       )}
       {(plot.hasWeed || plot.hasBug) && (
         <div className="tip-badges">
-          {plot.hasWeed && <span className="badge bad">🌾 杂草 · 生长减半</span>}
-          {plot.hasBug && <span className="badge bad">🐛 害虫 · 生长暂停</span>}
+          {plot.hasWeed && <span className="badge bad">{t('tip.weed')}</span>}
+          {plot.hasBug && <span className="badge bad">{t('tip.bug')}</span>}
         </div>
       )}
-      {plot.isWatered && growth.status === 'growing' && <div className="tip-badges"><span className="badge good">💧 已浇水 · 加速生长</span></div>}
+      {plot.isWatered && growth.status === 'growing' && <div className="tip-badges"><span className="badge good">{t('tip.watered')}</span></div>}
       {plot.fertilizer && growth.status === 'growing' && (
         <div className="tip-badges">
           <span className="badge good">
-            {plot.fertilizer.emoji ?? '🧪'} {plot.fertilizer.name}生效中 · 提速{Math.round(plot.fertilizer.speedBoost * 100)}%
-            {plot.fertilizer.yieldBoost ? ` · 增产${Math.round(plot.fertilizer.yieldBoost * 100)}%` : ''}
+            {t('tip.fertActive', {emoji: plot.fertilizer.emoji ?? '🧪', name: lname(plot.fertilizer, lang), s: Math.round(plot.fertilizer.speedBoost * 100)})}
+            {plot.fertilizer.yieldBoost ? t('tip.fertYield', {y: Math.round(plot.fertilizer.yieldBoost * 100)}) : ''}
           </span>
         </div>
       )}

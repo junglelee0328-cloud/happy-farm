@@ -1,6 +1,7 @@
 import {useEffect, useState} from 'react'
 import {SignedIn, SignedOut, SignIn, useUser} from '@clerk/clerk-react'
 import {client} from '../lib/sanity'
+import {useT} from '../i18n'
 
 const AVATARS = ['🧑‍🌾', '👨‍🌾', '👩‍🌾', '🧑‍🌻', '🐮', '🐰', '🐥', '🦊']
 
@@ -49,14 +50,15 @@ async function ensurePlayer(userId: string, nickname: string): Promise<string> {
 }
 
 export default function AuthGate({children}: {children: (playerId: string) => React.ReactNode}) {
+  const {t} = useT()
   return (
     <>
       <SignedOut>
         <div className="auth-page">
           <div className="auth-card">
             <div className="auth-logo">🌻</div>
-            <h1>开心农场</h1>
-            <p>种菜 · 浇水 · 偷好友的菜</p>
+            <h1>{t('auth.title')}</h1>
+            <p>{t('auth.slogan')}</p>
             <SignIn routing="hash" />
           </div>
         </div>
@@ -70,6 +72,7 @@ export default function AuthGate({children}: {children: (playerId: string) => Re
 
 function Bootstrap({children}: {children: (playerId: string) => React.ReactNode}) {
   const {user, isLoaded} = useUser()
+  const {t} = useT()
   const [playerId, setPlayerId] = useState('')
   const [error, setError] = useState('')
 
@@ -82,7 +85,7 @@ function Bootstrap({children}: {children: (playerId: string) => React.ReactNode}
       .catch((e) => setError(String(e?.message ?? e)))
   }, [isLoaded, user])
 
-  if (error) return <div className="loading">😵 建档失败：{error}</div>
-  if (!playerId) return <div className="loading">🌻 正在准备你的农场…</div>
+  if (error) return <div className="loading">{t('loading.bootstrapFail', {msg: error})}</div>
+  if (!playerId) return <div className="loading">{t('loading.prepare')}</div>
   return <>{children(playerId)}</>
 }

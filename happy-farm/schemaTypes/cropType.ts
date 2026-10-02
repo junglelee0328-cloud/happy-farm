@@ -6,6 +6,7 @@ export default defineType({
   type: 'document',
   fields: [
     defineField({name: 'name', title: '作物名称', type: 'string', validation: (r) => r.required()}),
+    defineField({name: 'nameEn', title: '英文名', type: 'string', description: '英文界面显示用'}),
     defineField({name: 'emoji', title: '成熟图标', type: 'string', description: 'Emoji，如 🥕'}),
     defineField({
       name: 'stageEmojis',

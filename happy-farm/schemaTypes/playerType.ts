@@ -13,6 +13,25 @@ export default defineType({
     defineField({name: 'xp', title: '当前经验', type: 'number', initialValue: 0}),
     defineField({name: 'coins', title: '金币', type: 'number', initialValue: 200}),
     defineField({name: 'stolenToday', title: '今日已偷菜次数', type: 'number', initialValue: 0}),
+    defineField({
+      name: 'inventory',
+      title: '背包',
+      type: 'array',
+      description: '化肥等道具库存',
+      of: [
+        {
+          type: 'object',
+          fields: [
+            {name: 'item', title: '道具', type: 'reference', to: [{type: 'fertilizer'}]},
+            {name: 'count', title: '数量', type: 'number'},
+          ],
+          preview: {
+            select: {name: 'item.name', count: 'count'},
+            prepare: ({name, count}) => ({title: `${name ?? '道具'} × ${count ?? 0}`}),
+          },
+        },
+      ],
+    }),
   ],
   preview: {
     select: {title: 'nickname', avatar: 'avatar', level: 'level', coins: 'coins'},

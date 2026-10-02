@@ -1,5 +1,6 @@
 import type {Crop, Player} from '../types'
 import {formatCountdown} from '../lib/growth'
+import {lname, useT} from '../i18n'
 
 interface Props {
   crops: Crop[]
@@ -13,6 +14,7 @@ interface Props {
   onQuickHarvest: () => void
   onQuickWater: () => void
   onOpenFriends: () => void
+  onOpenBag: () => void
   onGoHome: () => void
   onToast: (msg: string) => void
 }
@@ -29,22 +31,24 @@ export default function Toolbar({
   onQuickHarvest,
   onQuickWater,
   onOpenFriends,
+  onOpenBag,
   onGoHome,
   onToast,
 }: Props) {
+  const {t, lang} = useT()
   if (visiting) {
     return (
       <footer className="hud-bottom">
         <div className="dock">
           <div className="dock-section visiting-section">
             <div className="dock-title">
-              <span>🥷 做客模式</span>
-              <i>好友的菜只能偷，不能动他的仓库</i>
+              <span>{t('dock.visiting')}</span>
+              <i>{t('dock.visitingSub')}</i>
             </div>
             <div className="tool-row">
               <button className="tool-btn" onClick={onGoHome}>
                 <span className="tool-ico">🏠</span>
-                <span>回我的农场</span>
+                <span>{t('dock.goHome')}</span>
               </button>
             </div>
           </div>
@@ -58,8 +62,8 @@ export default function Toolbar({
       <div className="dock">
         <div className="dock-section seed-section">
           <div className="dock-title">
-            <span>🌾 种子包</span>
-            <i>{selectedSeedId ? '点击空地即可播种' : '选一粒种子'}</i>
+            <span>{t('dock.seeds')}</span>
+            <i>{selectedSeedId ? t('dock.seedsActive') : t('dock.seedsIdle')}</i>
           </div>
           <div className="seed-list">
             {crops.map((crop, i) => {
@@ -74,12 +78,12 @@ export default function Toolbar({
                   onClick={() => onSelectSeed(active ? '' : crop._id)}
                   title={
                     locked
-                      ? `Lv.${crop.minLevel} 解锁`
-                      : `${crop.name} · 种子 ${crop.seedPrice}💰 · ${formatCountdown(crop.growTime)} · ${crop.exp}经验`
+                      ? t('shop.locked', {n: crop.minLevel})
+                      : `${lname(crop, lang)} · ${crop.seedPrice}💰 · ${formatCountdown(crop.growTime)} · ${crop.exp}XP`
                   }
                 >
                   <span className="seed-emoji">{crop.emoji ?? '🌱'}</span>
-                  <span className="seed-name">{crop.name}</span>
+                  <span className="seed-name">{lname(crop, lang)}</span>
                   <span className={`seed-price ${poor && !locked ? 'poor' : ''}`}>
                     {locked ? `🔒${crop.minLevel}` : `${crop.seedPrice}`}
                   </span>
@@ -92,35 +96,35 @@ export default function Toolbar({
 
         <div className="dock-section tool-section">
           <div className="dock-title">
-            <span>🧰 工具箱</span>
-            <i>一键操作</i>
+            <span>{t('dock.tools')}</span>
+            <i>{t('dock.toolsSub')}</i>
           </div>
           <div className="tool-row">
             <button className="tool-btn" onClick={onOpenShop}>
               <span className="tool-ico">🛒</span>
-              <span>商店</span>
+              <span>{t('dock.shop')}</span>
             </button>
             <button className="tool-btn" onClick={onQuickHarvest} disabled={readyCount === 0}>
               <span className="tool-ico">🧺</span>
-              <span>一键收获</span>
+              <span>{t('dock.harvestAll')}</span>
               {readyCount > 0 && <em className="dot">{readyCount}</em>}
             </button>
             <button className="tool-btn" onClick={onQuickWater} disabled={thirstyCount === 0}>
               <span className="tool-ico">🚿</span>
-              <span>一键浇水</span>
+              <span>{t('dock.waterAll')}</span>
               {thirstyCount > 0 && <em className="dot blue">{thirstyCount}</em>}
             </button>
-            <button className="tool-btn" onClick={() => onToast('📦 仓库里堆着 0 件农产品，先种点东西吧～')}>
-              <span className="tool-ico">📦</span>
-              <span>仓库</span>
+            <button className="tool-btn" onClick={onOpenBag}>
+              <span className="tool-ico">🎒</span>
+              <span>{t('dock.bag')}</span>
             </button>
-            <button className="tool-btn" onClick={() => onToast('📋 任务系统：收获 3 次作物即可完成今日任务')}>
+            <button className="tool-btn" onClick={() => onToast('📋 Tasks: harvest 3 times today!')}>
               <span className="tool-ico">📋</span>
-              <span>任务</span>
+              <span>{t('dock.tasks')}</span>
             </button>
             <button className="tool-btn" onClick={onOpenFriends}>
               <span className="tool-ico">👥</span>
-              <span>好友</span>
+              <span>{t('dock.friends')}</span>
             </button>
           </div>
         </div>

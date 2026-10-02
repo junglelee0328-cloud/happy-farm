@@ -6,6 +6,7 @@ export default defineType({
   type: 'document',
   fields: [
     defineField({name: 'name', title: '名称', type: 'string', validation: (r) => r.required()}),
+    defineField({name: 'nameEn', title: '英文名', type: 'string'}),
     defineField({name: 'emoji', title: '图标', type: 'string'}),
     defineField({name: 'price', title: '价格(金币)', type: 'number'}),
     defineField({name: 'speedBoost', title: '生长提速', type: 'number', description: '如 0.1 = 提速 10%'}),

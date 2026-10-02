@@ -5,6 +5,7 @@ import './index.css'
 import App from './App.tsx'
 import AuthGate from './auth/AuthGate.tsx'
 import DevSprites from './DevSprites.tsx'
+import { LangProvider } from './i18n.tsx'
 
 // 打开 http://localhost:5173/?sprites 可以查看全部作物美术资源（开发用）
 const showSprites = new URLSearchParams(location.search).has('sprites')
@@ -16,10 +17,14 @@ const tree = showSprites ? (
   <DevSprites />
 ) : clerkKey ? (
   <ClerkProvider publishableKey={clerkKey}>
-    <AuthGate>{(playerId) => <App forcedPlayerId={playerId} />}</AuthGate>
+    <LangProvider>
+      <AuthGate>{(playerId) => <App forcedPlayerId={playerId} />}</AuthGate>
+    </LangProvider>
   </ClerkProvider>
 ) : (
-  <App />
+  <LangProvider>
+    <App />
+  </LangProvider>
 )
 
 createRoot(document.getElementById('root')!).render(<StrictMode>{tree}</StrictMode>)

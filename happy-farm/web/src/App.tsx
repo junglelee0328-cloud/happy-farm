@@ -9,11 +9,14 @@ import TopBar from './components/TopBar'
 import Toolbar from './components/Toolbar'
 import ShopModal from './components/ShopModal'
 import FriendModal from './components/FriendModal'
+import BackpackModal from './components/BackpackModal'
+import {lname, useT} from './i18n'
 import './App.css'
 
 let floaterId = 0
 
 export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
+  const {t, lang} = useT()
   const [crops, setCrops] = useState<Crop[]>([])
   const [fertilizers, setFertilizers] = useState<Fertilizer[]>([])
   const [players, setPlayers] = useState<Player[]>([])
@@ -34,6 +37,9 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
   const [friendId, setFriendId] = useState<string | null>(null)
   const [friendPlots, setFriendPlots] = useState<PlotWithCrop[]>([])
   const [friendModalOpen, setFriendModalOpen] = useState(false)
+  const [bagOpen, setBagOpen] = useState(false)
+  /** 背包里选中的化肥（进入点地施肥模式） */
+  const [fertId, setFertId] = useState('')
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const player = players.find((p) => p._id === playerId)
@@ -58,7 +64,7 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
     const [cropList, fertList, playerList, ruleDoc, plotList] = await Promise.all([
       client.fetch<Crop[]>('*[_type == "crop"] | order(minLevel asc)'),
       client.fetch<Fertilizer[]>('*[_type == "fertilizer"] | order(price asc)'),
-      client.fetch<Player[]>('*[_type == "player"]'),
+      client.fetch<Player[]>('*[_type == "player"]{..., inventory[]{_key, count, item->}}'),
       client.fetch<GameRule | null>('*[_type == "gameRule"][0]'),
       pid
         ? client.fetch<PlotWithCrop[]>('*[_type == "plot" && owner._ref == $pid] | order(index asc) {..., crop->, fertilizer->}', {pid})
@@ -146,9 +152,9 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
 
   const plant = (plot: PlotWithCrop, crop: Crop) =>
     run(async () => {
-      if (!player) throw new Error('没有选中玩家')
-      if (player.coins < crop.seedPrice) throw new Error('金币不足，先去收菜吧')
-      if (player.level < crop.minLevel) throw new Error(`需要 Lv.${crop.minLevel} 才能种${crop.name}`)
+      if (!player) throw new Error(t('err.noPlayer'))
+      if (player.coins < crop.seedPrice) throw new Error(t('err.noCoins'))
+      if (player.level < crop.minLevel) throw new Error(t('err.needLevel', {n: crop.minLevel, name: lname(crop, lang)}))
       await client
         .transaction()
         .patch(player._id, (p) => p.dec({coins: crop.seedPrice}))
@@ -166,42 +172,79 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
         )
         .commit()
       addFloater(plot.index, `-${crop.seedPrice} 💰`, 'xp')
-      return `🌱 种下了 ${crop.name}！`
+      return t('toast.planted', {name: lname(crop, lang)})
     }, '')
 
   const water = (plot: PlotWithCrop) =>
     run(async () => {
       await client.patch(plot._id).set({isWatered: true}).commit()
       addFloater(plot.index, '💧 加速中', 'xp', -26)
-    }, '浇水成功，生长加速 20%！')
+    }, t('toast.watered'))
 
-  const applyFertilizer = (plot: PlotWithCrop, fert: Fertilizer) =>
+  // 🧪 化肥：商店买入背包
+  const buyFert = (fert: Fertilizer) =>
     run(async () => {
-      if (!player) throw new Error('没有选中玩家')
-      if (player.coins < fert.price) throw new Error(`金币不足，${fert.name}需要 ${fert.price}💰`)
+      if (!player) throw new Error(t('err.noPlayer'))
+      if (player.coins < fert.price) throw new Error(t('err.fertPoor', {name: lname(fert, lang), price: fert.price}))
+      const inv = (player.inventory ?? []).map((e) => ({
+        _key: e._key,
+        item: e.item ? {_type: 'reference' as const, _ref: e.item._id} : undefined,
+        count: e.count,
+      }))
+      const idx = inv.findIndex((e) => e.item?._ref === fert._id)
+      if (idx >= 0) inv[idx] = {...inv[idx], count: inv[idx].count + 1}
+      else inv.push({_key: `fert-${fert._id}`, item: {_type: 'reference' as const, _ref: fert._id}, count: 1})
       await client
         .transaction()
-        .patch(player._id, (p) => p.dec({coins: fert.price}))
+        .patch(player._id, (p) => p.dec({coins: fert.price}).set({inventory: inv}))
+        .commit()
+      return t('toast.buyFert', {name: lname(fert, lang)})
+    }, '')
+
+  // 背包化肥 → 点到生长中的地上
+  const useFertilizer = (plot: PlotWithCrop) =>
+    run(async () => {
+      if (!player) throw new Error(t('err.noPlayer'))
+      const fert = fertilizers.find((f) => f._id === fertId)
+      if (!fert) throw new Error(t('toast.noFert'))
+      const inv = player.inventory ?? []
+      const entry = inv.find((e) => e.item?._id === fert._id)
+      if (!entry || entry.count <= 0) throw new Error(t('toast.noFert'))
+      const newInv = inv
+        .map((e) => ({
+          _key: e._key,
+          item: e.item ? {_type: 'reference' as const, _ref: e.item._id} : undefined,
+          count: e.item?._id === fert._id ? e.count - 1 : e.count,
+        }))
+        .filter((e) => e.count > 0)
+      await client
+        .transaction()
+        .patch(player._id, (p) => p.set({inventory: newInv}))
         .patch(plot._id, (p) => p.set({fertilizer: {_type: 'reference', _ref: fert._id}}))
         .commit()
-      addFloater(plot.index, `${fert.emoji ?? '🧪'} 提速${Math.round(fert.speedBoost * 100)}%`, 'xp', -26)
-      return `施了${fert.name}，本茬提速 ${Math.round(fert.speedBoost * 100)}%${fert.yieldBoost ? `、增产 ${Math.round(fert.yieldBoost * 100)}%` : ''}！`
+      setFertId('')
+      addFloater(plot.index, `${fert.emoji ?? '🧪'} +${Math.round(fert.speedBoost * 100)}%`, 'xp', -26)
+      return t('toast.usedFert', {
+        name: lname(fert, lang),
+        s: Math.round(fert.speedBoost * 100),
+        y: fert.yieldBoost ? t('tip.fertYield', {y: Math.round(fert.yieldBoost * 100)}) : '',
+      })
     }, '')
 
   const clearWeed = (plot: PlotWithCrop) =>
     run(async () => {
       await client.patch(plot._id).set({hasWeed: false}).commit()
-    }, '🌾 杂草清除，生长恢复正常！')
+    }, t('toast.weed'))
 
   const clearBug = (plot: PlotWithCrop) =>
     run(async () => {
       await client.patch(plot._id).set({hasBug: false}).commit()
-    }, '🐛 害虫消灭，作物继续生长！')
+    }, t('toast.bug'))
 
   const harvest = (plot: PlotWithCrop) =>
     run(async () => {
       const crop = plot.crop
-      if (!player || !crop) throw new Error('这块地没有作物')
+      if (!player || !crop) throw new Error(t('err.noCrop'))
       const yieldCoins = Math.round(
         crop.sellPrice * (1 + tierYieldBoost(effectiveTier(plot, player.level), rule) + (plot.fertilizer?.yieldBoost ?? 0)),
       )
@@ -221,7 +264,7 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
         setLevelUp(level)
         setTimeout(() => setLevelUp(null), 3200)
       }
-      return leveledUp ? `🎉 收获 ${crop.name}，升级到 Lv.${level}！` : `收获 ${crop.name} +${yieldCoins} 金币`
+      return leveledUp ? t('toast.levelup', {name: lname(crop, lang), level}) : t('toast.harvest', {name: lname(crop, lang), coins: yieldCoins})
     }, '')
 
   const clearWithered = (plot: PlotWithCrop) =>
@@ -231,18 +274,18 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
         .set({status: 'empty', isWatered: false, hasWeed: false, hasBug: false})
         .unset(['crop', 'plantedAt', 'stolenBy', 'fertilizer'])
         .commit()
-    }, '🧹 铲除了枯萎的作物')
+    }, t('toast.cleared'))
 
   // 🥷 偷菜：规则全部来自 gameRule 文档（stealRatio / stealDailyLimit）
   const steal = (plot: PlotWithCrop) =>
     run(async () => {
       const crop = plot.crop
-      if (!player || !crop || !friend) throw new Error('没有可偷的菜')
-      if (computeGrowth(plot, rule).status !== 'ready') throw new Error('还没熟，等等再来')
+      if (!player || !crop || !friend) throw new Error(t('err.noCrop'))
+      if (computeGrowth(plot, rule).status !== 'ready') throw new Error(t('err.notRipe'))
       const limit = rule?.stealDailyLimit ?? 5
-      if ((player.stolenToday ?? 0) >= limit) throw new Error(`今天已偷满 ${limit} 次，明天再来`)
+      if ((player.stolenToday ?? 0) >= limit) throw new Error(t('err.stealLimit', {n: limit}))
       const thieves = (plot.stolenBy ?? '').split('、').filter(Boolean)
-      if (thieves.includes(player.nickname)) throw new Error('这块地已经被你偷过啦')
+      if (thieves.includes(player.nickname)) throw new Error(t('err.stolenTwice'))
       const amount = Math.max(1, Math.floor(crop.sellPrice * (rule?.stealRatio ?? 0.2)))
       await client
         .transaction()
@@ -250,7 +293,7 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
         .patch(player._id, (p) => p.inc({coins: amount, stolenToday: 1}))
         .commit()
       addFloater(plot.index, `🥷 +${amount} 💰`, 'coin')
-      return `偷了${friend.nickname}的${crop.name}，+${amount} 金币！`
+      return t('toast.steal', {friend: friend.nickname, name: lname(crop, lang), coins: amount})
     }, '')
 
   const visitFriend = (f: Player) => {
@@ -266,8 +309,8 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
 
   const quickHarvest = () =>
     run(async () => {
-      if (!player) throw new Error('没有选中玩家')
-      if (!readyItems.length) throw new Error('还没有成熟的作物')
+      if (!player) throw new Error(t('err.noPlayer'))
+      if (!readyItems.length) throw new Error(t('err.nothingReady'))
       let xpGain = 0
       let coins = 0
       const tx = client.transaction()
@@ -291,19 +334,19 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
         setLevelUp(level)
         setTimeout(() => setLevelUp(null), 3200)
       }
-      return `🧺 一键收获 ${readyItems.length} 块地，+${coins} 金币 +${xpGain} 经验`
+      return t('toast.harvestAll', {n: readyItems.length, coins, xp: xpGain})
     }, '')
 
   const quickWater = () =>
     run(async () => {
-      if (!thirstyItems.length) throw new Error('所有作物都浇过水啦')
+      if (!thirstyItems.length) throw new Error(t('err.allWatered'))
       const tx = client.transaction()
       for (const {plot} of thirstyItems) {
         addFloater(plot.index, '💧', 'xp', -26)
         tx.patch(plot._id, (p) => p.set({isWatered: true}))
       }
       await tx.commit()
-      return `🚿 给 ${thirstyItems.length} 块地浇了水，生长加速！`
+      return t('toast.waterAll', {n: thirstyItems.length})
     }, '')
 
   const openShopForPlot = (plot: PlotWithCrop) => {
@@ -330,6 +373,7 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setSeedId('')
+        setFertId('')
         return
       }
       const n = Number(e.key)
@@ -341,9 +385,9 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
     return () => window.removeEventListener('keydown', onKey)
   }, [crops, player])
 
-  if (loading) return <div className="loading">🌻 正在打开农场大门…</div>
-  if (error) return <div className="loading">😵 加载失败：{error}</div>
-  if (!player) return <div className="loading">😢 还没有玩家，请先在 Studio 里创建一个</div>
+  if (loading) return <div className="loading">{t('loading.open')}</div>
+  if (error) return <div className="loading">{t('loading.fail', {msg: error})}</div>
+  if (!player) return <div className="loading">{t('loading.noplayer')}</div>
 
   const levelInfo = levelForXp(player.xp, rule)
   const shopPlot = (plots.find((p) => p._id === shopPlotId) ?? null) as Plot | null
@@ -367,25 +411,25 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
       <main className="stage">
         {friend && (
           <div className="visiting-banner">
-            👀 你正在「{friend.farmName ?? `${friend.nickname}的农场`}」做客
+            {t('banner.visiting', {name: friend.farmName ?? `${friend.nickname}`})}
             <span className="visiting-sub">
-              今日偷菜 {player.stolenToday ?? 0}/{rule?.stealDailyLimit ?? 5} · 点成熟作物偷菜，也能帮忙浇水除草
+              {t('banner.sub', {a: player.stolenToday ?? 0, b: rule?.stealDailyLimit ?? 5})}
             </span>
-            <button className="home-btn" onClick={goHome}>🏠 回我的农场</button>
+            <button className="home-btn" onClick={goHome}>🏠 {t('dock.goHome')}</button>
           </div>
         )}
         <FarmScene
           items={friend ? friendGrown : grown}
           player={friend ?? player}
           busy={busy}
-          seedName={friend ? undefined : seed?.name}
+          seedName={friend ? undefined : seed ? lname(seed, lang) : undefined}
           floaters={floaters}
           rule={rule}
           mode={friend ? 'friend' : 'mine'}
           visitorName={player.nickname}
           stolenLeft={(rule?.stealDailyLimit ?? 5) - (player.stolenToday ?? 0)}
           stealRatio={rule?.stealRatio}
-          fertilizers={fertilizers}
+          fertSelected={!!fertId && !friend}
           onPlant={handleTilePlant}
           onOpenShop={openShopForPlot}
           onWater={water}
@@ -394,16 +438,19 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
           onHarvest={harvest}
           onClearWithered={clearWithered}
           onSteal={steal}
-          onFertilize={applyFertilizer}
+          onFertilize={useFertilizer}
+          onOpenBag={() => setBagOpen(true)}
         />
 
         <div className="stage-hint">
           {friend ? (
-            <span className="hint-chip active">🥷 做客模式：点成熟的菜偷走它 · 好友的生长中作物可以帮忙照料</span>
+            <span className="hint-chip active">{t('hint.visiting')}</span>
+          ) : fertId ? (
+            <span className="hint-chip active">{t('hint.selectFert', {name: lname(fertilizers.find((f) => f._id === fertId), lang)})}</span>
           ) : seed ? (
-            <span className="hint-chip active">🌱 已选中「{seed.name}」，点空地播种 · Esc 取消</span>
+            <span className="hint-chip active">{t('hint.selectSeed', {name: lname(seed, lang)})}</span>
           ) : (
-            <span className="hint-chip">💡 在下方「种子包」选一粒种子 → 点空地播种 · 浇水加速 · 成熟点一下就收</span>
+            <span className="hint-chip">{t('hint.idle')}</span>
           )}
         </div>
 
@@ -411,8 +458,8 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
           <div className="levelup">
             <div className="levelup-ring">Lv.{levelUp}</div>
             <div className="levelup-text">
-              <b>升级啦！</b>
-              <i>新的土地正在等你开垦</i>
+              <b>{t('levelup.title')}</b>
+              <i>{t('levelup.sub')}</i>
             </div>
           </div>
         )}
@@ -430,6 +477,7 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
         onQuickHarvest={quickHarvest}
         onQuickWater={quickWater}
         onOpenFriends={() => setFriendModalOpen(true)}
+        onOpenBag={() => setBagOpen(true)}
         onGoHome={goHome}
         onToast={showToast}
       />
@@ -440,17 +488,30 @@ export default function App({forcedPlayerId}: {forcedPlayerId?: string}) {
         <FriendModal friends={friends} onClose={() => setFriendModalOpen(false)} onVisit={visitFriend} />
       )}
 
+      {bagOpen && (
+        <BackpackModal
+          player={player}
+          onClose={() => setBagOpen(false)}
+          onUse={(fert) => {
+            setBagOpen(false)
+            setFertId(fert._id)
+          }}
+        />
+      )}
+
       {shopOpen && (
         <ShopModal
           plot={shopPlot}
           crops={crops}
+          fertilizers={fertilizers}
           player={player}
           onClose={() => setShopOpen(false)}
+          onBuyFert={buyFert}
           onPick={(crop) => {
             const target = shopPlot ?? plots.find((p) => player.level >= (p.unlockLevel ?? 1) && !p.crop)
             setShopOpen(false)
             if (!target) {
-              showToast('🤔 没有可用的空地了，先收获或者升级解锁新地吧', 'bad')
+              showToast(t('toast.noEmptyPlot'), 'bad')
               return
             }
             plant(target as PlotWithCrop, crop)
